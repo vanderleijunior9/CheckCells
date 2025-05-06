@@ -19,19 +19,19 @@ export function SidebarItem({ icon, text, active = false, alert = false, onClick
       onClick={onClick}
       className={`flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors ${
         active 
-          ? "bg-gray-100 text-black" 
+          ? "bg-white text-black" 
           : "hover:bg-gray-100"
       }`}
     >
       <div className="relative">
-        <div className={`${active ? "text-[#02B191]" : "text-gray-500"}`}>
+        <div className={`${active ? "text-green-check" : "text-gray-500"}`}>
           {icon}
         </div>
         {alert && (
           <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
         )}
       </div>
-      <span className={`${active ? "font-medium" : "text-gray-700"}`}>
+      <span className={`${active ? "font-medium text-green-check" : "text-gray-700"}`}>
         {text}
       </span>
     </div>
@@ -45,22 +45,22 @@ export function SidebarItemBottom({ icon, text, active = false, alert = false, o
       onClick={onClick}
       className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
         active 
-          ? "bg-gray-100 text-black" 
+          ? "bg-white text-black" 
           : "hover:bg-gray-200"
       }`}
     >
       <div className="relative">
-        <div className={`text-sm ${active ? "text-[#02B191]" : "text-gray-500"}`}>
+        <div className={`text-sm ${active ? "text-green-check bg-white" : "text-gray-500"}`}>
           {icon}
         </div>
         {alert && (
           <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
         )}
       </div>
-      <span className={`text-sm ${active ? "font-medium" : "text-gray-700"}`}>
+      <span className={`text-sm ${active ? "font-medium text-green-check bg-white" : "text-gray-700"}`}>
         {text}
       </span>
-    </div>
+    </div>  
   );
 }
 
@@ -71,7 +71,7 @@ const ActionButton = ({ icon, label, onClick, active = false }) => {
       onClick={onClick}
       className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors hover:bg-grey-300 ${
         active 
-          ? "bg-green text-white" 
+          ? "bg-green-check text-white" 
           : "hover:bg-gray-200"
       }`}
     >
@@ -112,7 +112,7 @@ export default function Sidebar({ children }) {
   };
 
   return (
-    <div className="w-[250px] h-dvh bg-gray-50 border-r border-slate-100 flex flex-col shadow-lg">
+    <div className="w-[250px] h-dvh bg-washed-grey border-r border-slate-100 flex flex-col shadow-lg">
       <Logo />
       
       <div className="px-2 space-y-1">
