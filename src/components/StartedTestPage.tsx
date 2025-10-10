@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import connectDeviceImg from "../assets/connect-device.png";
-import { createTest } from "../services/api";
 
 interface FormData {
   scientist?: string;
@@ -18,76 +17,21 @@ const StartedTestPage = () => {
   const form = (location.state as FormData) || {};
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
 
   const handleBack = () => {
     navigate("/new-test", { state: form });
   };
 
-  // Function to push test data to API
-  const pushTestDataToAPI = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess("");
-
-      // TODO: Add your conditional logic here
-      // Example condition check:
-      const meetsRequirements = checkTestRequirements();
-
-      if (!meetsRequirements) {
-        setError("Test data does not meet requirements");
-        setLoading(false);
-        return false;
-      }
-
-      // Prepare test data for API
-      const testData = {
-        diagnosticianName: form.scientist || "",
-        testId: form.testId || "",
-        testType: "All parameters", // You can make this dynamic
-        dateOfTest: new Date().toLocaleDateString(),
-        status: "Analyzing",
-      };
-
-      // Push data to API
-      const result = await createTest(testData);
-
-      setSuccess(`Test created successfully! ID: ${result.testId}`);
-      setLoading(false);
-      return true;
-    } catch (err) {
-      setError("Failed to push test data to API");
-      console.error("API Error:", err);
-      setLoading(false);
-      return false;
-    }
-  };
-
-  // Placeholder function for your conditional logic
-  const checkTestRequirements = (): boolean => {
-    // TODO: Implement your criteria checking logic here
-    // For now, allow any data
-    return true;
-  };
-
   const handleConnectDevice = async () => {
     setError("");
-    setSuccess("");
     setLoading(true);
 
     try {
-      // First, push test data to API
-      const apiSuccess = await pushTestDataToAPI();
-
-      if (!apiSuccess) {
-        return; // Stop if API push failed
-      }
-
-      // Then connect to camera
+      // Connect to camera and navigate to CameraView
+      // API posting will happen when videos are uploaded in CameraView
       await navigator.mediaDevices.getUserMedia({ video: true });
       setLoading(false);
-      navigate("/camera-view");
+      navigate("/camera-view", { state: form });
     } catch (e) {
       setLoading(false);
       setError("Failed to start camera");
@@ -161,9 +105,6 @@ const StartedTestPage = () => {
           </button>
           {error && (
             <span className="text-red-600 font-semibold mt-2">{error}</span>
-          )}
-          {success && (
-            <span className="text-green-600 font-semibold mt-2">{success}</span>
           )}
         </div>
       </div>

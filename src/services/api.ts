@@ -89,13 +89,19 @@ export const createTest = async (
   testData: Partial<TestData>
 ): Promise<TestData> => {
   try {
-    // Transform TestData to ApiParameter format
+    // Transform TestData to ApiParameter format with actual data
     const parameterData = {
       name: testData.diagnosticianName || "",
-      volume: Math.floor(Math.random() * 100),
-      days: Math.floor(Math.random() * 100),
-      delution: Math.floor(Math.random() * 100),
+      testId: testData.testId || "",
+      volume: testData.volume || 0,
+      days: testData.days || 0,
+      delution: testData.delution || 0,
+      dateOfTest: testData.dateOfTest || new Date().toLocaleDateString(),
+      testType: testData.testType || "All parameters",
+      status: testData.status || "Completed",
     };
+
+    console.log("Posting to API:", `${API_BASE_URL}/parameters`, parameterData);
 
     const response = await fetch(`${API_BASE_URL}/parameters`, {
       method: "POST",
@@ -106,21 +112,32 @@ export const createTest = async (
     });
 
     if (!response.ok) {
-      throw new Error("Failed to create test");
+      const errorText = await response.text().catch(() => "No error details");
+      console.error(`API Error ${response.status}:`, errorText);
+      throw new Error(
+        `Failed to create test: ${response.status} ${response.statusText}`
+      );
     }
 
     const item: ApiParameter = await response.json();
+    console.log("API Response:", item);
 
     // Transform the API response back to TestData structure
     return {
       diagnosticianName: item.name,
       testId: item.testId || `TEST-${String(item.id).padStart(6, "0")}`,
-      dateOfTest: new Date().toLocaleDateString(),
-      testType: testData.testType || "All parameters",
-      status: "Analyzing",
+      dateOfTest: item.dateOfTest || new Date().toLocaleDateString(),
+      testType: item.testType || "All parameters",
+      status: item.status || "Completed",
+      volume: item.volume,
+      days: item.days,
+      delution: item.delution,
     };
   } catch (error) {
     console.error("Error creating test:", error);
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error("Network error: Unable to connect to the server");
+    }
     throw error;
   }
 };
@@ -153,8 +170,17 @@ export const updateTestComments = async (
     });
 
     if (!response.ok) {
-      throw new Error("Failed to update comments");
+      if (response.status === 404) {
+        throw new Error(
+          `Test ${testIdStr} not found (404) - cannot update comments`
+        );
+      }
+      throw new Error(
+        `Failed to update comments: ${response.status} ${response.statusText}`
+      );
     }
+
+    console.log("Comments updated successfully for testId:", testIdStr);
   } catch (error) {
     console.error("Error updating comments:", error);
     throw error;
@@ -181,19 +207,35 @@ export const fetchTestComments = async (testId: string): Promise<string> => {
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`);
 
     if (!response.ok) {
-      console.error(
-        "API response not OK:",
+      // 404 means the test doesn't exist yet - this is expected for new tests
+      if (response.status === 404) {
+        console.log(
+          `Test ${testIdStr} not found in API (404) - will use default comments`
+        );
+        return "";
+      }
+
+      // For other errors, log but don't throw
+      console.warn(
+        `API response not OK for testId ${testIdStr}:`,
         response.status,
         response.statusText
       );
-      throw new Error(`Failed to fetch comments: ${response.status}`);
+      return "";
     }
 
     const item: ApiParameter = await response.json();
     console.log("Fetched item:", item);
     return item.comments || "";
   } catch (error) {
-    console.error("Error fetching comments for testId:", testId, error);
+    // Network errors or JSON parse errors - log but don't crash
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      console.warn(
+        `Network error fetching comments for testId ${testId} - will use defaults`
+      );
+    } else {
+      console.warn(`Error fetching comments for testId ${testId}:`, error);
+    }
     // Return empty string instead of throwing to prevent UI breaks
     return "";
   }
