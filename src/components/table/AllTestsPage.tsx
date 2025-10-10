@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader, CircleCheck, Search } from "lucide-react";
-import testData from "../../data/testData.json";
+import { fetchTestData, TestData as ApiTestData } from "../../services/api";
 
 interface TestData {
   diagnosticianName: string;
@@ -11,10 +11,32 @@ interface TestData {
   status: string;
 }
 
-const TableComponent = () => {
+const AllTestsPage = () => {
   const navigate = useNavigate();
   const [selectedOption, setSelectedOption] = useState("");
   const [search, setSearch] = useState("");
+  const [testData, setTestData] = useState<ApiTestData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch test data from API
+  useEffect(() => {
+    const loadTestData = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchTestData();
+        setTestData(data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to load test data");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTestData();
+  }, []);
 
   // Filter data based on search and selectedOption
   const filteredData = testData.filter((row: TestData) => {
@@ -37,7 +59,7 @@ const TableComponent = () => {
           <input
             type="text"
             placeholder="Search by Test ID or Scientist"
-            className="w-full sm:w-[260px] pl-3 pr-4 py-2 border text-sm h-[.3in] border-gray-300 focus:outline-none rounded-lg focus:ring-1 focus:ring-black text-black "
+            className="w-full sm:w-[280px] px-3 py-2.5 border text-sm min-h-[0.1in] border-gray-300 focus:outline-none rounded-lg focus:ring-2 focus:ring-black text-black placeholder-gray-400 overflow-hidden text-ellipsis"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -89,35 +111,61 @@ const TableComponent = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredData.map((row: TestData, index: number) => (
-            <tr
-              key={index}
-              className="even:bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
-              onClick={() => handleRowClick(row)}
-            >
-              <td className="py-2 px-4 text-sm">{row.diagnosticianName}</td>
-              <td className="py-2 px-4 text-sm">{row.testId}</td>
-              <td className="py-2 px-4 text-sm">{row.dateOfTest}</td>
-              <td className="py-2 px-4 text-sm">{row.testType}</td>
-              <td className="py-2 px-4">
-                {row.status === "Analyzing" ? (
-                  <span className="flex items-center text-sm">
-                    <Loader size={17} className="mr-3 text-blue-500" />
-                    {row.status}
-                  </span>
-                ) : (
-                  <span className="flex items-center text-sm">
-                    <CircleCheck size={18} className="mr-3 text-green-500" />
-                    {row.status}
-                  </span>
-                )}
+          {loading ? (
+            <tr>
+              <td colSpan={5} className="py-8 text-center">
+                <div className="flex items-center justify-center">
+                  <Loader
+                    size={20}
+                    className="mr-2 animate-spin text-green-check"
+                  />
+                  <span className="text-gray-600">Loading tests...</span>
+                </div>
               </td>
             </tr>
-          ))}
+          ) : error ? (
+            <tr>
+              <td colSpan={5} className="py-8 text-center text-red-600">
+                {error}
+              </td>
+            </tr>
+          ) : filteredData.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="py-8 text-center text-gray-600">
+                No tests found
+              </td>
+            </tr>
+          ) : (
+            filteredData.map((row: TestData, index: number) => (
+              <tr
+                key={index}
+                className="even:bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                onClick={() => handleRowClick(row)}
+              >
+                <td className="py-2 px-4 text-sm">{row.diagnosticianName}</td>
+                <td className="py-2 px-4 text-sm">{row.testId}</td>
+                <td className="py-2 px-4 text-sm">{row.dateOfTest}</td>
+                <td className="py-2 px-4 text-sm">{row.testType}</td>
+                <td className="py-2 px-4">
+                  {row.status === "Analyzing" ? (
+                    <span className="flex items-center text-sm">
+                      <Loader size={17} className="mr-3 text-blue-500" />
+                      {row.status}
+                    </span>
+                  ) : (
+                    <span className="flex items-center text-sm">
+                      <CircleCheck size={18} className="mr-3 text-green-500" />
+                      {row.status}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
   );
 };
 
-export default TableComponent;
+export default AllTestsPage;

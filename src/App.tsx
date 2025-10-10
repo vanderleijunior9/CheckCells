@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import { HousePlus, Settings, Package, FileSpreadsheet } from "lucide-react";
-import TableComponent from "./components/table/TableComponent";
+import AllTestsPage from "./components/table/AllTestsPage";
 import Navbar from "./components/Navbar";
 import { Newtestpage } from "./components/Newtestpage";
 import StartedTestPage from "./components/StartedTestPage";
@@ -19,7 +19,7 @@ export default function App() {
             <Navbar />
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/all-tests" element={<TableComponent />} />
+              <Route path="/all-tests" element={<AllTestsPage />} />
               <Route path="/new-test" element={<Newtestpage />} />
               <Route path="/started-test" element={<StartedTestPage />} />
               <Route path="/camera-view" element={<CameraView />} />

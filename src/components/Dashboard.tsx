@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useFormOptions } from "./FormOptionContext";
 import {
   Loader,
@@ -7,11 +7,35 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
-import testData from "../data/testData.json";
+import { fetchTestData, TestData as ApiTestData } from "../services/api";
 
 const Dashboard = () => {
   const { selectedOptions } = useFormOptions();
   const [currentWeekOffset, setCurrentWeekOffset] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [testData, setTestData] = useState<ApiTestData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const itemsPerPage = 10;
+
+  // Fetch test data from API
+  useEffect(() => {
+    const loadTestData = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchTestData();
+        setTestData(data);
+        setError(null);
+      } catch (err) {
+        setError("Failed to load test data");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTestData();
+  }, []);
 
   // Calendar data
   const currentDate = new Date();
@@ -58,6 +82,64 @@ const Dashboard = () => {
   const displayDate = weekDates[3]; // Wednesday of the week
   const displayMonth = displayDate.toLocaleString("default", { month: "long" });
   const displayYear = displayDate.getFullYear();
+
+  // Pagination calculations
+  const totalPages = Math.ceil(testData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentData = testData.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
+  };
 
   return (
     <div className="m">
@@ -155,28 +237,120 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-  {testData.slice(0, 10).map((row, index) => (
-    <tr key={index} className="border-b border-gray-100">
-      <td className="py-2 px-3 text-gray-700">{row.diagnosticianName}</td>
-      <td className="py-2 px-3 text-gray-700">{row.testId}</td>
-      <td className="py-2 px-3 text-gray-700">{row.testType}</td>
-      <td className="py-2 px-3">
-        {row.status === "Analyzing" ? (
-          <span className="flex items-center text-xs text-gray-700">
-            <Loader size={12} className="mr-1 text-blue-600" />
-            {row.status}
-          </span>
-        ) : (
-          <span className="flex items-center text-xs text-gray-700">
-            <CircleCheck size={12} className="mr-1 text-green-600" />
-            {row.status}
-          </span>
-        )}
-      </td>
-    </tr>
-  ))}
-</tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center">
+                    <div className="flex items-center justify-center">
+                      <Loader
+                        size={20}
+                        className="mr-2 animate-spin text-green-check"
+                      />
+                      <span className="text-gray-600">Loading tests...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-red-600">
+                    {error}
+                  </td>
+                </tr>
+              ) : (
+                currentData.map((row, index) => (
+                  <tr key={index} className="border-b border-gray-100">
+                    <td className="py-2 px-3 text-gray-700">
+                      {row.diagnosticianName}
+                    </td>
+                    <td className="py-2 px-3 text-gray-700">{row.testId}</td>
+                    <td className="py-2 px-3 text-gray-700">{row.testType}</td>
+                    <td className="py-2 px-3">
+                      {row.status === "Analyzing" ? (
+                        <span className="flex items-center text-xs text-gray-700">
+                          <Loader size={12} className="mr-1 text-blue-600" />
+                          {row.status}
+                        </span>
+                      ) : (
+                        <span className="flex items-center text-xs text-gray-700">
+                          <CircleCheck
+                            size={12}
+                            className="mr-1 text-green-600"
+                          />
+                          {row.status}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
           </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="mt-6 flex items-center justify-between border-t pt-4">
+          <div className="text-sm text-gray-600">
+            Showing {startIndex + 1} to {Math.min(endIndex, testData.length)} of{" "}
+            {testData.length} results
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Previous Button */}
+            <button
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1}
+              className={`px-3 py-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors ${
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+
+            {/* Page Numbers */}
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((page, index) => {
+                if (page === "...") {
+                  return (
+                    <span
+                      key={`ellipsis-${index}`}
+                      className="px-3 py-2 text-gray-500"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page as number)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === page
+                        ? "bg-green-check text-white"
+                        : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-2 rounded-lg flex items-center gap-1 text-sm font-medium transition-colors ${
+                currentPage === totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -184,4 +358,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
