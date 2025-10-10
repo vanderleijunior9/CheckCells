@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronUp, Info, List, Check, ChevronLeft as ChevronLeftIcon, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronUp,
+  Info,
+  List,
+  Check,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight,
+} from "lucide-react";
 import { fetchTestComments, updateTestComments } from "../services/api";
 
 interface TestData {
@@ -63,17 +71,17 @@ const TestDetails = () => {
           setLoadingDetails(true);
           const testIdStr = String(testData.testId);
           let id = testIdStr;
-          
+
           if (testIdStr.startsWith("TEST-")) {
             id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
           } else if (testIdStr.startsWith("TST-")) {
             id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
           }
-          
+
           const response = await fetch(
             `https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters/${id}`
           );
-          
+
           if (response.ok) {
             const fullData = await response.json();
             setTestData((prev) => ({
@@ -82,7 +90,7 @@ const TestDetails = () => {
               days: fullData.days,
               delution: fullData.delution,
             }));
-            
+
             // Check if video exists and add to videos array
             if (fullData.video) {
               setVideos([fullData.video]);
@@ -269,7 +277,7 @@ const TestDetails = () => {
                       className="w-full rounded-lg bg-black"
                       style={{ maxHeight: "400px" }}
                     />
-                    
+
                     {/* Navigation Controls */}
                     {videos.length > 1 && (
                       <div className="flex items-center justify-between mt-4">
@@ -280,11 +288,11 @@ const TestDetails = () => {
                           <ChevronLeftIcon size={20} />
                           Previous
                         </button>
-                        
+
                         <span className="text-gray-600">
                           {currentVideoIndex + 1} / {videos.length}
                         </span>
-                        
+
                         <button
                           onClick={handleNextVideo}
                           className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"

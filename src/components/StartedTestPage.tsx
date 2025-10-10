@@ -67,32 +67,8 @@ const StartedTestPage = () => {
   // Placeholder function for your conditional logic
   const checkTestRequirements = (): boolean => {
     // TODO: Implement your criteria checking logic here
-    // Example conditions:
-
-    // Check if all required fields are filled
-    if (!form.scientist || !form.testId || !form.volume || !form.days) {
-      return false;
-    }
-
-    // Check if volume is within acceptable range
-    const volume = parseFloat(form.volume || "0");
-    if (volume < 1 || volume > 100) {
-      return false;
-    }
-
-    // Check if days is within acceptable range
-    const days = parseInt(form.days || "0");
-    if (days < 1 || days > 10) {
-      return false;
-    }
-
-    // Add more conditions as needed
-    // Example:
-    // - Check dilution values
-    // - Check test ID format
-    // - Validate scientist name
-
-    return true; // All conditions met
+    // For now, allow any data
+    return true;
   };
 
   const handleConnectDevice = async () => {
