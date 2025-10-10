@@ -24,8 +24,11 @@ const TestDetails = () => {
   const navigate = useNavigate();
   const [testData, setTestData] = useState<TestData | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
- 
+  const [isEditingComments, setIsEditingComments] = useState(false);
+  const [comments, setComments] = useState(
+    "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights."
+  );
+  const [tempComments, setTempComments] = useState(comments);
 
   useEffect(() => {
     // Try to get test data from sessionStorage first, then from location.state
@@ -51,6 +54,23 @@ const TestDetails = () => {
 
   const handleBack = () => {
     navigate("/all-tests");
+  };
+
+  const handleEditClick = () => {
+    setIsEditingComments(true);
+    setTempComments(comments);
+  };
+
+  const handleSaveComments = () => {
+    setComments(tempComments);
+    setIsEditingComments(false);
+    // TODO: Add API call to save comments to backend
+    // await updateTestComments(testData.testId, tempComments);
+  };
+
+  const handleCancelEdit = () => {
+    setTempComments(comments);
+    setIsEditingComments(false);
   };
 
 
@@ -118,13 +138,42 @@ const TestDetails = () => {
                   <p className="text-[#353b40] text-base mb-2">
                     Additional comments
                   </p>
-                  <p className="text-[#0c0c0d] text-base">
-                    The semen sample was meticulously collected on May 15, 2025,
-                    at the CC Lab, where it will undergo thorough analysis to
-                    ensure accurate results and provide valuable insights.
-                  </p>
+                  {isEditingComments ? (
+                    <div className="space-y-3">
+                      <textarea
+                        value={tempComments}
+                        onChange={(e) => setTempComments(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-check text-[#0c0c0d] text-base resize-none"
+                        rows={4}
+                        placeholder="Enter additional comments..."
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveComments}
+                          className="bg-green-check text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[#0c0c0d] text-base">{comments}</p>
+                  )}
                 </div>
-                <button className="text-[#353b40] underline ml-4">Edit</button>
+                {!isEditingComments && (
+                  <button
+                    onClick={handleEditClick}
+                    className="text-[#353b40] underline ml-4 hover:text-gray-900 transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
 

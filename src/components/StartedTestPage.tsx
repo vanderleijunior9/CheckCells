@@ -34,7 +34,7 @@ const StartedTestPage = () => {
       // TODO: Add your conditional logic here
       // Example condition check:
       const meetsRequirements = checkTestRequirements();
-      
+
       if (!meetsRequirements) {
         setError("Test data does not meet requirements");
         setLoading(false);
@@ -52,7 +52,7 @@ const StartedTestPage = () => {
 
       // Push data to API
       const result = await createTest(testData);
-      
+
       setSuccess(`Test created successfully! ID: ${result.testId}`);
       setLoading(false);
       return true;
@@ -68,7 +68,7 @@ const StartedTestPage = () => {
   const checkTestRequirements = (): boolean => {
     // TODO: Implement your criteria checking logic here
     // Example conditions:
-    
+
     // Check if all required fields are filled
     if (!form.scientist || !form.testId || !form.volume || !form.days) {
       return false;
@@ -91,7 +91,7 @@ const StartedTestPage = () => {
     // - Check dilution values
     // - Check test ID format
     // - Validate scientist name
-    
+
     return true; // All conditions met
   };
 
@@ -99,11 +99,11 @@ const StartedTestPage = () => {
     setError("");
     setSuccess("");
     setLoading(true);
-    
+
     try {
       // First, push test data to API
       const apiSuccess = await pushTestDataToAPI();
-      
+
       if (!apiSuccess) {
         return; // Stop if API push failed
       }
@@ -196,4 +196,3 @@ const StartedTestPage = () => {
 };
 
 export default StartedTestPage;
-
