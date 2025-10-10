@@ -12,6 +12,7 @@ interface ApiParameter {
   volume: number;
   days: number;
   delution: number;
+  testId?: string;
 }
 
 // MockAPI endpoint
@@ -31,7 +32,7 @@ export const fetchTestData = async (): Promise<TestData[]> => {
     // Transform the API data to match our TestData structure
     return data.map((item) => ({
       diagnosticianName: item.name,
-      testId: `TEST-${String(item.id).padStart(6, "0")}`,
+      testId: item.testId || `TEST-${String(item.id).padStart(6, "0")}`,
       dateOfTest: new Date(
         Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
       ).toLocaleDateString(),
@@ -67,7 +68,7 @@ export const fetchTestDetails = async (testId: string): Promise<TestData> => {
     // Transform the API data to match our TestData structure
     return {
       diagnosticianName: item.name,
-      testId: `TEST-${String(item.id).padStart(6, "0")}`,
+      testId: item.testId || `TEST-${String(item.id).padStart(6, "0")}`,
       dateOfTest: new Date(
         Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
       ).toLocaleDateString(),
@@ -117,7 +118,7 @@ export const createTest = async (
     // Transform the API response back to TestData structure
     return {
       diagnosticianName: item.name,
-      testId: `TEST-${String(item.id).padStart(6, "0")}`,
+      testId: item.testId || `TEST-${String(item.id).padStart(6, "0")}`,
       dateOfTest: new Date().toLocaleDateString(),
       testType: testData.testType || "All parameters",
       status: "Analyzing",
