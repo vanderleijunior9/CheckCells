@@ -54,17 +54,18 @@ const TestDetails = () => {
       if (testData?.testId) {
         try {
           setLoadingComments(true);
+          console.log("Loading comments for test:", testData.testId);
           const fetchedComments = await fetchTestComments(testData.testId);
-          setComments(
-            fetchedComments ||
-              "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights."
-          );
-          setTempComments(fetchedComments || "");
+          
+          const defaultComments = "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights.";
+          
+          setComments(fetchedComments || defaultComments);
+          setTempComments(fetchedComments || defaultComments);
         } catch (error) {
           console.error("Failed to load comments:", error);
-          setComments(
-            "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights."
-          );
+          const defaultComments = "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights.";
+          setComments(defaultComments);
+          setTempComments(defaultComments);
         } finally {
           setLoadingComments(false);
         }

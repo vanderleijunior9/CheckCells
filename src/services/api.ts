@@ -138,7 +138,7 @@ export const updateTestComments = async (
   try {
     // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
     const id = testId.replace("TEST-", "").replace(/^0+/, "");
-    
+
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`, {
       method: "PUT",
       headers: {
@@ -160,18 +160,28 @@ export const updateTestComments = async (
 export const fetchTestComments = async (testId: string): Promise<string> => {
   try {
     // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
-    const id = testId.replace("TEST-", "").replace(/^0+/, "");
+    let id = testId;
+    
+    // If testId starts with "TEST-", extract the number
+    if (testId.startsWith("TEST-")) {
+      id = testId.replace("TEST-", "").replace(/^0+/, "") || "1";
+    }
+    
+    console.log("Fetching comments for testId:", testId, "-> API ID:", id);
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`);
 
     if (!response.ok) {
-      throw new Error("Failed to fetch comments");
+      console.error("API response not OK:", response.status, response.statusText);
+      throw new Error(`Failed to fetch comments: ${response.status}`);
     }
 
     const item: ApiParameter = await response.json();
+    console.log("Fetched item:", item);
     return item.comments || "";
   } catch (error) {
-    console.error("Error fetching comments:", error);
-    throw error;
+    console.error("Error fetching comments for testId:", testId, error);
+    // Return empty string instead of throwing to prevent UI breaks
+    return "";
   }
 };
 
