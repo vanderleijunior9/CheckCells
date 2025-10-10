@@ -136,9 +136,19 @@ export const updateTestComments = async (
   comments: string
 ): Promise<void> => {
   try {
-    // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
-    const id = testId.replace("TEST-", "").replace(/^0+/, "");
-
+    // Convert to string if needed
+    const testIdStr = String(testId);
+    
+    // Extract the ID from the testId (e.g., "TEST-000001" -> "1" or "TST-001" -> "1")
+    let id = testIdStr;
+    
+    if (testIdStr.startsWith("TEST-")) {
+      id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
+    } else if (testIdStr.startsWith("TST-")) {
+      id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
+    }
+    
+    console.log("Updating comments for testId:", testIdStr, "-> API ID:", id);
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`, {
       method: "PUT",
       headers: {
@@ -159,19 +169,28 @@ export const updateTestComments = async (
 // Function to fetch test comments
 export const fetchTestComments = async (testId: string): Promise<string> => {
   try {
-    // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
-    let id = testId;
+    // Convert to string if needed
+    const testIdStr = String(testId);
     
-    // If testId starts with "TEST-", extract the number
-    if (testId.startsWith("TEST-")) {
-      id = testId.replace("TEST-", "").replace(/^0+/, "") || "1";
+    // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
+    let id = testIdStr;
+    
+    // If testId starts with "TEST-" or "TST-", extract the number
+    if (testIdStr.startsWith("TEST-")) {
+      id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
+    } else if (testIdStr.startsWith("TST-")) {
+      id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
     }
     
-    console.log("Fetching comments for testId:", testId, "-> API ID:", id);
+    console.log("Fetching comments for testId:", testIdStr, "-> API ID:", id);
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`);
 
     if (!response.ok) {
-      console.error("API response not OK:", response.status, response.statusText);
+      console.error(
+        "API response not OK:",
+        response.status,
+        response.statusText
+      );
       throw new Error(`Failed to fetch comments: ${response.status}`);
     }
 

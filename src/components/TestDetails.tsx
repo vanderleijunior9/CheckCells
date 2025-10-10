@@ -56,14 +56,14 @@ const TestDetails = () => {
           setLoadingComments(true);
           console.log("Loading comments for test:", testData.testId);
           const fetchedComments = await fetchTestComments(testData.testId);
-          
-          const defaultComments = "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights.";
-          
+
+          const defaultComments = "Defaut comment -- api not working";
           setComments(fetchedComments || defaultComments);
           setTempComments(fetchedComments || defaultComments);
         } catch (error) {
           console.error("Failed to load comments:", error);
-          const defaultComments = "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights.";
+          const defaultComments =
+            "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights.";
           setComments(defaultComments);
           setTempComments(defaultComments);
         } finally {
