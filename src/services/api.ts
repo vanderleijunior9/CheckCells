@@ -4,6 +4,9 @@ interface TestData {
   dateOfTest: string;
   testType: string;
   status: string;
+  volume?: number;
+  days?: number;
+  delution?: number;
 }
 
 interface ApiParameter {
@@ -40,6 +43,9 @@ export const fetchTestData = async (): Promise<TestData[]> => {
       dateOfTest: item.dateOfTest || new Date().toLocaleDateString(),
       testType: item.testType || "All parameters",
       status: item.status || "Completed",
+      volume: item.volume,
+      days: item.days,
+      delution: item.delution,
     }));
   } catch (error) {
     console.error("Error fetching test data:", error);
@@ -63,19 +69,13 @@ export const fetchTestDetails = async (testId: string): Promise<TestData> => {
     // Transform the API data to match our TestData structure
     return {
       diagnosticianName: item.name,
-      testId: item.testId || `TEST-${String(item.id).padStart(6, "0")}`,
-      dateOfTest: new Date(
-        Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-      ).toLocaleDateString(),
-      testType: [
-        "pH",
-        "Vitality",
-        "All parameters",
-        "Motility",
-        "Morphology",
-        "Concentration",
-      ][parseInt(item.id) % 6],
-      status: parseInt(item.id) % 3 === 0 ? "Analyzing" : "Completed",
+      testId: item.testId || item.id,
+      dateOfTest: item.dateOfTest || new Date().toLocaleDateString(),
+      testType: item.testType || "All parameters",
+      status: item.status || "Completed",
+      volume: item.volume,
+      days: item.days,
+      delution: item.delution,
     };
   } catch (error) {
     console.error("Error fetching test details:", error);

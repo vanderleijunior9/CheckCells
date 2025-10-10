@@ -9,16 +9,19 @@ interface TestData {
   dateOfTest: string;
   testType: string;
   status: string;
+  volume?: number;
+  days?: number;
+  delution?: number;
 }
 
-interface TestResult {
-  name: string;
-  result: string;
-  unit: string;
-  normalRange: string;
-  status: "normal" | "low" | "high";
-  position: number;
-}
+// interface TestResult {
+//   name: string;
+//   result: string;
+//   unit: string;
+//   normalRange: string;
+//   status: "normal" | "low" | "high";
+//   position: number;
+// }
 
 const TestDetails = () => {
   const location = useLocation();
@@ -30,6 +33,7 @@ const TestDetails = () => {
   const [tempComments, setTempComments] = useState("");
   const [loadingComments, setLoadingComments] = useState(true);
   const [savingComments, setSavingComments] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(true);
 
   useEffect(() => {
     // Try to get test data from sessionStorage first, then from location.state
@@ -47,6 +51,45 @@ const TestDetails = () => {
       }
     }
   }, [location.state, navigate]);
+
+  // Fetch full test details from API
+  useEffect(() => {
+    const loadFullDetails = async () => {
+      if (testData?.testId) {
+        try {
+          setLoadingDetails(true);
+          const testIdStr = String(testData.testId);
+          let id = testIdStr;
+
+          if (testIdStr.startsWith("TEST-")) {
+            id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
+          } else if (testIdStr.startsWith("TST-")) {
+            id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
+          }
+
+          const response = await fetch(
+            `https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters/${id}`
+          );
+
+          if (response.ok) {
+            const fullData = await response.json();
+            setTestData((prev) => ({
+              ...prev!,
+              volume: fullData.volume,
+              days: fullData.days,
+              delution: fullData.delution,
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to load full test details:", error);
+        } finally {
+          setLoadingDetails(false);
+        }
+      }
+    };
+
+    loadFullDetails();
+  }, [testData?.testId]);
 
   // Fetch comments when testData is available
   useEffect(() => {
@@ -143,28 +186,50 @@ const TestDetails = () => {
             </div>
 
             {/* Test Info Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className=" p-6 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="p-6 rounded-lg bg-white">
                 <p className="text-[#353b40] text-base mb-2">
                   Laboratory Scientist
                 </p>
                 <p className="text-black text-base">
-                  {testData.diagnosticianName}
+                  {loadingDetails ? "Loading..." : testData.diagnosticianName}
                 </p>
               </div>
-              <div className=" p-6 rounded-lg">
+              <div className="p-6 rounded-lg bg-white">
                 <p className="text-gray-800 text-base mb-2">Test ID</p>
-                <p className="text-black text-base">{testData.testId}</p>
-              </div>
-              <div className=" p-6 rounded-lg">
-                <p className="text-gray-800 text-base mb-2">
-                  Sexual abstinence interval
+                <p className="text-black text-base">
+                  {loadingDetails ? "Loading..." : testData.testId}
                 </p>
-                <p className="text-black text-base">2 days</p>
               </div>
-              <div className=" p-6 rounded-lg">
+              <div className="p-6 rounded-lg bg-white">
+                <p className="text-gray-800 text-base mb-2">Volume</p>
+                <p className="text-black text-base">
+                  {loadingDetails
+                    ? "Loading..."
+                    : `${testData.volume || "N/A"} mL`}
+                </p>
+              </div>
+              <div className="p-6 rounded-lg bg-white">
+                <p className="text-gray-800 text-base mb-2">
+                  Days Since Ejaculation
+                </p>
+                <p className="text-black text-base">
+                  {loadingDetails
+                    ? "Loading..."
+                    : `${testData.days || "N/A"} days`}
+                </p>
+              </div>
+              <div className="p-6 rounded-lg bg-white">
+                <p className="text-gray-800 text-base mb-2">Dilution</p>
+                <p className="text-black text-base">
+                  {loadingDetails ? "Loading..." : testData.delution || "N/A"}
+                </p>
+              </div>
+              <div className="p-6 rounded-lg bg-white">
                 <p className="text-gray-800 text-base mb-2">Test Type</p>
-                <p className="text-black text-base">{testData.testType}</p>
+                <p className="text-black text-base">
+                  {loadingDetails ? "Loading..." : testData.testType}
+                </p>
               </div>
             </div>
 
