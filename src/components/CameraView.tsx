@@ -43,55 +43,95 @@ const CameraView = () => {
     navigate(-1);
   };
 
+  const compressVideo = async (videoBlob: Blob): Promise<Blob> => {
+    // Create a video element to get frames
+    const videoUrl = URL.createObjectURL(videoBlob);
+    const video = document.createElement('video');
+    video.src = videoUrl;
+    
+    return new Promise((resolve) => {
+      video.onloadedmetadata = async () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Reduce resolution for smaller file size
+        const scale = 0.5; // 50% of original size
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        
+        // Capture frames at lower quality
+        const frames: string[] = [];
+        const fps = 5; // Capture 5 frames per second (reduced from 30)
+        const duration = video.duration;
+        const frameInterval = 1 / fps;
+        
+        for (let time = 0; time < Math.min(duration, 10); time += frameInterval) {
+          video.currentTime = time;
+          await new Promise(r => { video.onseeked = r; });
+          
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // Lower quality JPEG for smaller size
+            const frame = canvas.toDataURL('image/jpeg', 0.5);
+            frames.push(frame);
+          }
+        }
+        
+        // Store as JSON with metadata instead of full video
+        const compressedData = JSON.stringify({
+          frames: frames.slice(0, 20), // Max 20 frames
+          width: canvas.width,
+          height: canvas.height,
+          duration: Math.min(duration, 10)
+        });
+        
+        const blob = new Blob([compressedData], { type: 'application/json' });
+        URL.revokeObjectURL(videoUrl);
+        resolve(blob);
+      };
+    });
+  };
+
   const uploadVideoToAPI = async (videoBlob: Blob) => {
     try {
       setUploading(true);
+      setUploadStatus("Compressing video...");
+      
+      // Compress video first
+      const compressedBlob = await compressVideo(videoBlob);
+      
       setUploadStatus("Uploading video...");
 
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(videoBlob);
+      // Convert compressed blob to text
+      const text = await compressedBlob.text();
+      
+      // Upload to API
+      const response = await fetch(
+        "https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Video Recording",
+            video: text,
+            volume: 0,
+            days: 0,
+            delution: 0,
+            timestamp: new Date().toISOString(),
+          }),
+        }
+      );
 
-      await new Promise((resolve, reject) => {
-        reader.onloadend = async () => {
-          try {
-            const base64data = reader.result as string;
-
-            // Upload to API - you can customize this endpoint
-            const response = await fetch(
-              "https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  name: "Video Recording",
-                  video: base64data,
-                  volume: 0,
-                  days: 0,
-                  delution: 0,
-                  timestamp: new Date().toISOString(),
-                }),
-              }
-            );
-
-            if (response.ok) {
-              setUploadStatus("Video uploaded successfully!");
-              setTimeout(() => {
-                navigate("/all-tests");
-              }, 2000);
-            } else {
-              setUploadStatus("Upload failed. Please try again.");
-            }
-            resolve(true);
-          } catch (error) {
-            setUploadStatus("Upload failed. Please try again.");
-            reject(error);
-          }
-        };
-        reader.onerror = reject;
-      });
+      if (response.ok) {
+        setUploadStatus("Video uploaded successfully!");
+        setTimeout(() => {
+          navigate("/all-tests");
+        }, 2000);
+      } else {
+        setUploadStatus(`Upload failed: ${response.status}. Please try again.`);
+      }
     } catch (error) {
       console.error("Error uploading video:", error);
       setUploadStatus("Upload failed. Please try again.");
