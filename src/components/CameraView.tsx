@@ -81,14 +81,14 @@ const CameraView = () => {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        // Reduce resolution for smaller file size
-        const scale = 0.5; // 50% of original size
+        // Aggressive resolution reduction for smaller file size
+        const scale = 0.3; // 30% of original size (reduced from 50%)
         canvas.width = video.videoWidth * scale;
         canvas.height = video.videoHeight * scale;
 
-        // Capture frames at lower quality
+        // Capture frames at very low rate
         const frames: string[] = [];
-        const fps = 5; // Capture 5 frames per second (reduced from 30)
+        const fps = 2; // Capture 2 frames per second (reduced from 5)
         const duration = video.duration;
         const frameInterval = 1 / fps;
 
@@ -104,15 +104,15 @@ const CameraView = () => {
 
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Lower quality JPEG for smaller size
-            const frame = canvas.toDataURL("image/jpeg", 0.5);
+            // Very low quality JPEG for much smaller size
+            const frame = canvas.toDataURL("image/jpeg", 0.3);
             frames.push(frame);
           }
         }
 
-        // Store as JSON with metadata instead of full video
+        // Store as JSON with metadata, limit frames more aggressively
         const compressedData = JSON.stringify({
-          frames: frames.slice(0, 20), // Max 20 frames
+          frames: frames.slice(0, 10), // Max 10 frames (reduced from 20)
           width: canvas.width,
           height: canvas.height,
           duration: Math.min(duration, 10),
@@ -162,6 +162,13 @@ const CameraView = () => {
         setTimeout(() => {
           navigate("/all-tests");
         }, 2000);
+      } else if (response.status === 413) {
+        setUploadStatus("Video is still too large. Recording saved locally only.");
+        console.error("413 Error: Video compressed but still too large for API");
+        // Still navigate after showing message
+        setTimeout(() => {
+          navigate("/all-tests");
+        }, 3000);
       } else {
         setUploadStatus(`Upload failed: ${response.status}. Please try again.`);
       }
@@ -262,7 +269,8 @@ const CameraView = () => {
               Review your recording
             </p>
             <p className="text-blue-600 text-sm">
-              Please review the video above. Accept to upload or reject to record again.
+              Please review the video above. Accept to upload or reject to
+              record again.
             </p>
           </div>
         </div>

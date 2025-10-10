@@ -195,12 +195,12 @@ export default function Sidebar() {
           active={activeItem === "All Tests"}
           onClick={() => handleItemClick("All Tests")}
         />
-        <SidebarItem
+        {/* <SidebarItem
           icon={<Package size={20} />}
           text="Buy Tests"
           active={activeItem === "Buy Tests"}
           onClick={() => handleItemClick("Buy Tests")}
-        />
+        /> */}
         <hr className="solid" />
         <SidebarItem
           icon={<Trello size={20} />}
