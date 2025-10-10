@@ -20,6 +20,7 @@ interface ApiParameter {
   dateOfTest?: string;
   testType?: string;
   status?: string;
+  video?: string;
 }
 
 // MockAPI endpoint

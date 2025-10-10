@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronUp, Info, List, Check } from "lucide-react";
+import { ArrowLeft, ChevronUp, Info, List, Check, ChevronLeft as ChevronLeftIcon, ChevronRight } from "lucide-react";
 import { fetchTestComments, updateTestComments } from "../services/api";
 
 interface TestData {
@@ -34,6 +34,9 @@ const TestDetails = () => {
   const [loadingComments, setLoadingComments] = useState(true);
   const [savingComments, setSavingComments] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(true);
+  const [videos, setVideos] = useState<string[]>([]);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [loadingVideos, setLoadingVideos] = useState(true);
 
   useEffect(() => {
     // Try to get test data from sessionStorage first, then from location.state
@@ -60,17 +63,17 @@ const TestDetails = () => {
           setLoadingDetails(true);
           const testIdStr = String(testData.testId);
           let id = testIdStr;
-
+          
           if (testIdStr.startsWith("TEST-")) {
             id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
           } else if (testIdStr.startsWith("TST-")) {
             id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
           }
-
+          
           const response = await fetch(
             `https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters/${id}`
           );
-
+          
           if (response.ok) {
             const fullData = await response.json();
             setTestData((prev) => ({
@@ -79,11 +82,17 @@ const TestDetails = () => {
               days: fullData.days,
               delution: fullData.delution,
             }));
+            
+            // Check if video exists and add to videos array
+            if (fullData.video) {
+              setVideos([fullData.video]);
+            }
           }
         } catch (error) {
           console.error("Failed to load full test details:", error);
         } finally {
           setLoadingDetails(false);
+          setLoadingVideos(false);
         }
       }
     };
@@ -151,6 +160,14 @@ const TestDetails = () => {
   const handleCancelEdit = () => {
     setTempComments(comments);
     setIsEditingComments(false);
+  };
+
+  const handlePreviousVideo = () => {
+    setCurrentVideoIndex((prev) => (prev > 0 ? prev - 1 : videos.length - 1));
+  };
+
+  const handleNextVideo = () => {
+    setCurrentVideoIndex((prev) => (prev < videos.length - 1 ? prev + 1 : 0));
   };
 
   return (
@@ -232,6 +249,55 @@ const TestDetails = () => {
                 </p>
               </div>
             </div>
+
+            {/* Video Slideshow */}
+            {videos.length > 0 && (
+              <div className="bg-white p-6 rounded-lg">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                  Recorded Video
+                </h2>
+                {loadingVideos ? (
+                  <div className="flex items-center justify-center py-12">
+                    <span className="text-gray-400">Loading videos...</span>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    {/* Video Player */}
+                    <video
+                      src={videos[currentVideoIndex]}
+                      controls
+                      className="w-full rounded-lg bg-black"
+                      style={{ maxHeight: "400px" }}
+                    />
+                    
+                    {/* Navigation Controls */}
+                    {videos.length > 1 && (
+                      <div className="flex items-center justify-between mt-4">
+                        <button
+                          onClick={handlePreviousVideo}
+                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                        >
+                          <ChevronLeftIcon size={20} />
+                          Previous
+                        </button>
+                        
+                        <span className="text-gray-600">
+                          {currentVideoIndex + 1} / {videos.length}
+                        </span>
+                        
+                        <button
+                          onClick={handleNextVideo}
+                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                        >
+                          Next
+                          <ChevronRight size={20} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Additional Comments */}
             <div className="bg-white p-6 rounded-lg">

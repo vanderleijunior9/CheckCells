@@ -7,7 +7,7 @@ const CameraView = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const navigate = useNavigate();
-  
+
   const [isRecording, setIsRecording] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [uploading, setUploading] = useState(false);
@@ -51,12 +51,12 @@ const CameraView = () => {
       // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(videoBlob);
-      
+
       await new Promise((resolve, reject) => {
         reader.onloadend = async () => {
           try {
             const base64data = reader.result as string;
-            
+
             // Upload to API - you can customize this endpoint
             const response = await fetch(
               "https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters",
@@ -107,7 +107,7 @@ const CameraView = () => {
     const mediaRecorder = new MediaRecorder(streamRef.current, {
       mimeType: "video/webm",
     });
-    
+
     mediaRecorderRef.current = mediaRecorder;
 
     mediaRecorder.ondataavailable = (event) => {
@@ -147,7 +147,7 @@ const CameraView = () => {
       <h1 className="text-2xl font-bold mb-6 text-gray-900">
         Camera Live View
       </h1>
-      
+
       {/* Recording Indicator */}
       {isRecording && (
         <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
@@ -155,27 +155,29 @@ const CameraView = () => {
           <span className="font-semibold">Recording: {countdown}s</span>
         </div>
       )}
-      
+
       {/* Upload Status */}
       {uploadStatus && (
-        <div className={`mb-4 px-4 py-2 rounded-lg ${
-          uploadStatus.includes("success") 
-            ? "bg-green-100 text-green-700" 
-            : uploadStatus.includes("failed")
-            ? "bg-red-100 text-red-700"
-            : "bg-blue-100 text-blue-700"
-        }`}>
+        <div
+          className={`mb-4 px-4 py-2 rounded-lg ${
+            uploadStatus.includes("success")
+              ? "bg-green-100 text-green-700"
+              : uploadStatus.includes("failed")
+              ? "bg-red-100 text-red-700"
+              : "bg-blue-100 text-blue-700"
+          }`}
+        >
           {uploadStatus}
         </div>
       )}
-      
+
       <video
         ref={videoRef}
         autoPlay
         playsInline
         className="rounded-2xl shadow-lg border border-slate-200 w-full max-w-lg aspect-video bg-black"
       />
-      
+
       <div className="mt-8 flex gap-4">
         {!isRecording && !uploading ? (
           <>
@@ -213,4 +215,3 @@ const CameraView = () => {
 };
 
 export default CameraView;
-
