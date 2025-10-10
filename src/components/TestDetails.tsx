@@ -42,9 +42,10 @@ const TestDetails = () => {
   const [loadingComments, setLoadingComments] = useState(true);
   const [savingComments, setSavingComments] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(true);
-  const [videos, setVideos] = useState<string[]>([]);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [videoFrames, setVideoFrames] = useState<string[]>([]);
+  const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [loadingVideos, setLoadingVideos] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     // Try to get test data from sessionStorage first, then from location.state
@@ -91,9 +92,16 @@ const TestDetails = () => {
               delution: fullData.delution,
             }));
 
-            // Check if video exists and add to videos array
+            // Check if video exists and parse frames
             if (fullData.video) {
-              setVideos([fullData.video]);
+              try {
+                const videoData = JSON.parse(fullData.video);
+                if (videoData.frames && Array.isArray(videoData.frames)) {
+                  setVideoFrames(videoData.frames);
+                }
+              } catch (e) {
+                console.error("Failed to parse video data:", e);
+              }
             }
           }
         } catch (error) {
@@ -170,13 +178,37 @@ const TestDetails = () => {
     setIsEditingComments(false);
   };
 
-  const handlePreviousVideo = () => {
-    setCurrentVideoIndex((prev) => (prev > 0 ? prev - 1 : videos.length - 1));
+  const handlePreviousFrame = () => {
+    setCurrentFrameIndex((prev) => (prev > 0 ? prev - 1 : videoFrames.length - 1));
+    setIsPlaying(false);
   };
 
-  const handleNextVideo = () => {
-    setCurrentVideoIndex((prev) => (prev < videos.length - 1 ? prev + 1 : 0));
+  const handleNextFrame = () => {
+    setCurrentFrameIndex((prev) => (prev < videoFrames.length - 1 ? prev + 1 : 0));
+    setIsPlaying(false);
   };
+
+  const togglePlayPause = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  // Auto-advance frames when playing
+  useEffect(() => {
+    if (isPlaying && videoFrames.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentFrameIndex((prev) => {
+          if (prev < videoFrames.length - 1) {
+            return prev + 1;
+          } else {
+            setIsPlaying(false); // Stop at end
+            return prev;
+          }
+        });
+      }, 500); // 2 FPS playback (500ms per frame)
+
+      return () => clearInterval(interval);
+    }
+  }, [isPlaying, videoFrames.length]);
 
   return (
     <div className="p-6 min-h-screen">
@@ -259,49 +291,74 @@ const TestDetails = () => {
             </div>
 
             {/* Video Slideshow */}
-            {videos.length > 0 && (
+            {videoFrames.length > 0 && (
               <div className="bg-white p-6 rounded-lg">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
                   Recorded Video
                 </h2>
                 {loadingVideos ? (
                   <div className="flex items-center justify-center py-12">
-                    <span className="text-gray-400">Loading videos...</span>
+                    <span className="text-gray-400">Loading video...</span>
                   </div>
                 ) : (
                   <div className="relative">
-                    {/* Video Player */}
-                    <video
-                      src={videos[currentVideoIndex]}
-                      controls
-                      className="w-full rounded-lg bg-black"
-                      style={{ maxHeight: "400px" }}
-                    />
+                    {/* Frame Display */}
+                    <div className="relative w-full rounded-lg bg-black overflow-hidden">
+                      <img
+                        src={videoFrames[currentFrameIndex]}
+                        alt={`Frame ${currentFrameIndex + 1}`}
+                        className="w-full h-auto"
+                        style={{ maxHeight: "400px", objectFit: "contain" }}
+                      />
+                      
+                      {/* Play/Pause Overlay */}
+                      <button
+                        onClick={togglePlayPause}
+                        className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all"
+                      >
+                        <div className="w-16 h-16 bg-white bg-opacity-80 rounded-full flex items-center justify-center">
+                          {isPlaying ? (
+                            <div className="flex gap-1">
+                              <div className="w-2 h-6 bg-gray-800"></div>
+                              <div className="w-2 h-6 bg-gray-800"></div>
+                            </div>
+                          ) : (
+                            <div className="w-0 h-0 border-l-[12px] border-l-gray-800 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent ml-1"></div>
+                          )}
+                        </div>
+                      </button>
+                    </div>
 
                     {/* Navigation Controls */}
-                    {videos.length > 1 && (
-                      <div className="flex items-center justify-between mt-4">
-                        <button
-                          onClick={handlePreviousVideo}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-                        >
-                          <ChevronLeftIcon size={20} />
-                          Previous
-                        </button>
+                    <div className="flex items-center justify-between mt-4">
+                      <button
+                        onClick={handlePreviousFrame}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                      >
+                        <ChevronLeftIcon size={20} />
+                        Previous
+                      </button>
 
+                      <div className="flex flex-col items-center gap-2">
                         <span className="text-gray-600">
-                          {currentVideoIndex + 1} / {videos.length}
+                          Frame {currentFrameIndex + 1} / {videoFrames.length}
                         </span>
-
                         <button
-                          onClick={handleNextVideo}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                          onClick={togglePlayPause}
+                          className="px-4 py-1 bg-green-check text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                         >
-                          Next
-                          <ChevronRight size={20} />
+                          {isPlaying ? "Pause" : "Play"}
                         </button>
                       </div>
-                    )}
+
+                      <button
+                        onClick={handleNextFrame}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                      >
+                        Next
+                        <ChevronRight size={20} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

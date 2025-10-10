@@ -163,8 +163,12 @@ const CameraView = () => {
           navigate("/all-tests");
         }, 2000);
       } else if (response.status === 413) {
-        setUploadStatus("Video is still too large. Recording saved locally only.");
-        console.error("413 Error: Video compressed but still too large for API");
+        setUploadStatus(
+          "Video is still too large. Recording saved locally only."
+        );
+        console.error(
+          "413 Error: Video compressed but still too large for API"
+        );
         // Still navigate after showing message
         setTimeout(() => {
           navigate("/all-tests");
