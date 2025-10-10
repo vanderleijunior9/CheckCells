@@ -13,6 +13,7 @@ interface ApiParameter {
   days: number;
   delution: number;
   testId?: string;
+  comments?: string;
 }
 
 // MockAPI endpoint
@@ -125,6 +126,51 @@ export const createTest = async (
     };
   } catch (error) {
     console.error("Error creating test:", error);
+    throw error;
+  }
+};
+
+// Function to update test comments
+export const updateTestComments = async (
+  testId: string,
+  comments: string
+): Promise<void> => {
+  try {
+    // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
+    const id = testId.replace("TEST-", "").replace(/^0+/, "");
+    
+    const response = await fetch(`${API_BASE_URL}/parameters/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ comments }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to update comments");
+    }
+  } catch (error) {
+    console.error("Error updating comments:", error);
+    throw error;
+  }
+};
+
+// Function to fetch test comments
+export const fetchTestComments = async (testId: string): Promise<string> => {
+  try {
+    // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
+    const id = testId.replace("TEST-", "").replace(/^0+/, "");
+    const response = await fetch(`${API_BASE_URL}/parameters/${id}`);
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch comments");
+    }
+
+    const item: ApiParameter = await response.json();
+    return item.comments || "";
+  } catch (error) {
+    console.error("Error fetching comments:", error);
     throw error;
   }
 };
