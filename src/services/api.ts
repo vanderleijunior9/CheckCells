@@ -14,6 +14,9 @@ interface ApiParameter {
   delution: number;
   testId?: string;
   comments?: string;
+  dateOfTest?: string;
+  testType?: string;
+  status?: string;
 }
 
 // MockAPI endpoint
@@ -30,22 +33,13 @@ export const fetchTestData = async (): Promise<TestData[]> => {
 
     const data: ApiParameter[] = await response.json();
 
-    // Transform the API data to match our TestData structure
+    // Return raw data as-is from API
     return data.map((item) => ({
       diagnosticianName: item.name,
-      testId: item.testId || `TEST-${String(item.id).padStart(6, "0")}`,
-      dateOfTest: new Date(
-        Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-      ).toLocaleDateString(),
-      testType: [
-        "pH",
-        "Vitality",
-        "All parameters",
-        "Motility",
-        "Morphology",
-        "Concentration",
-      ][parseInt(item.id) % 6],
-      status: parseInt(item.id) % 3 === 0 ? "Analyzing" : "Completed",
+      testId: item.testId || item.id,
+      dateOfTest: item.dateOfTest || new Date().toLocaleDateString(),
+      testType: item.testType || "All parameters",
+      status: item.status || "Completed",
     }));
   } catch (error) {
     console.error("Error fetching test data:", error);
@@ -138,16 +132,16 @@ export const updateTestComments = async (
   try {
     // Convert to string if needed
     const testIdStr = String(testId);
-    
+
     // Extract the ID from the testId (e.g., "TEST-000001" -> "1" or "TST-001" -> "1")
     let id = testIdStr;
-    
+
     if (testIdStr.startsWith("TEST-")) {
       id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
     } else if (testIdStr.startsWith("TST-")) {
       id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
     }
-    
+
     console.log("Updating comments for testId:", testIdStr, "-> API ID:", id);
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`, {
       method: "PUT",
@@ -171,17 +165,17 @@ export const fetchTestComments = async (testId: string): Promise<string> => {
   try {
     // Convert to string if needed
     const testIdStr = String(testId);
-    
+
     // Extract the ID from the testId (e.g., "TEST-000001" -> "1")
     let id = testIdStr;
-    
+
     // If testId starts with "TEST-" or "TST-", extract the number
     if (testIdStr.startsWith("TEST-")) {
       id = testIdStr.replace("TEST-", "").replace(/^0+/, "") || "1";
     } else if (testIdStr.startsWith("TST-")) {
       id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
     }
-    
+
     console.log("Fetching comments for testId:", testIdStr, "-> API ID:", id);
     const response = await fetch(`${API_BASE_URL}/parameters/${id}`);
 
