@@ -152,10 +152,16 @@ const CameraView = () => {
         dilution: formData.dilution,
       });
       console.log(`Number of videos: ${acceptedVideos.length}`);
-      console.log(`S3 Upload: ${isS3Configured() ? "ENABLED ✅" : "DISABLED ❌"}`);
+      console.log(
+        `S3 Upload: ${isS3Configured() ? "ENABLED ✅" : "DISABLED ❌"}`
+      );
       if (isS3Configured()) {
         console.log(`S3 Bucket: testingcheckcells`);
-        console.log(`Videos will be uploaded to: s3://testingcheckcells/videos/${formData.testId || 'unknown'}/`);
+        console.log(
+          `Videos will be uploaded to: s3://testingcheckcells/videos/${
+            formData.testId || "unknown"
+          }/`
+        );
       }
       console.log("===========================");
 
@@ -286,7 +292,9 @@ const CameraView = () => {
       // Upload original video to S3 if configured
       if (isS3Configured()) {
         setUploadStatus(`Uploading video ${recordingNumber} to S3...`);
-        console.log(`📤 Uploading video ${recordingNumber} to S3 bucket: testingcheckcells`);
+        console.log(
+          `📤 Uploading video ${recordingNumber} to S3 bucket: testingcheckcells`
+        );
 
         try {
           const fileName = generateS3FileName(
@@ -302,7 +310,9 @@ const CameraView = () => {
 
           console.log(`📁 S3 File path: ${fileName}`);
           s3Url = await uploadVideoToS3(videoBlob, fileName, metadata);
-          console.log(`✅ Video ${recordingNumber} uploaded successfully to S3!`);
+          console.log(
+            `✅ Video ${recordingNumber} uploaded successfully to S3!`
+          );
           console.log(`🔗 S3 URL: ${s3Url}`);
         } catch (s3Error) {
           console.error(
@@ -312,7 +322,9 @@ const CameraView = () => {
           setUploadStatus(`S3 upload failed, using compressed version...`);
         }
       } else {
-        console.log(`⚠️ S3 not configured - video ${recordingNumber} will only be compressed`);
+        console.log(
+          `⚠️ S3 not configured - video ${recordingNumber} will only be compressed`
+        );
       }
 
       setUploadStatus(`Compressing video ${recordingNumber}...`);
@@ -576,6 +588,32 @@ const CameraView = () => {
                 </div>
               </div>
             </div>
+
+            {/* Recorded Videos Preview */}
+            {acceptedVideos.length > 0 && (
+              <div className="bg-white rounded-lg p-6 mb-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Recorded Videos ({acceptedVideos.length})
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {acceptedVideos.map((videoBlob, index) => (
+                    <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        Recording {index + 1}
+                      </p>
+                      <video
+                        src={URL.createObjectURL(videoBlob)}
+                        controls
+                        className="rounded-lg w-full aspect-video bg-black"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        Size: {(videoBlob.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-blue-100 border border-blue-200 rounded-lg p-4 text-center">
               <p className="text-blue-800 font-medium">
