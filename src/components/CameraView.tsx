@@ -152,6 +152,11 @@ const CameraView = () => {
         dilution: formData.dilution,
       });
       console.log(`Number of videos: ${acceptedVideos.length}`);
+      console.log(`S3 Upload: ${isS3Configured() ? "ENABLED ✅" : "DISABLED ❌"}`);
+      if (isS3Configured()) {
+        console.log(`S3 Bucket: testingcheckcells`);
+        console.log(`Videos will be uploaded to: s3://testingcheckcells/videos/${formData.testId || 'unknown'}/`);
+      }
       console.log("===========================");
 
       // Upload all accepted videos to API first
@@ -275,33 +280,41 @@ const CameraView = () => {
   const uploadVideoToAPI = async (videoBlob: Blob, recordingNumber: number) => {
     try {
       setUploading(true);
-      
+
       let s3Url = "";
-      
+
       // Upload original video to S3 if configured
       if (isS3Configured()) {
         setUploadStatus(`Uploading video ${recordingNumber} to S3...`);
-        
+        console.log(`📤 Uploading video ${recordingNumber} to S3 bucket: testingcheckcells`);
+
         try {
           const fileName = generateS3FileName(
             formData.testId || "unknown",
             recordingNumber
           );
-          
+
           const metadata = {
             scientist: formData.scientist || "",
             testId: formData.testId || "",
             recordingNumber: recordingNumber.toString(),
           };
-          
+
+          console.log(`📁 S3 File path: ${fileName}`);
           s3Url = await uploadVideoToS3(videoBlob, fileName, metadata);
-          console.log(`Video ${recordingNumber} uploaded to S3:`, s3Url);
+          console.log(`✅ Video ${recordingNumber} uploaded successfully to S3!`);
+          console.log(`🔗 S3 URL: ${s3Url}`);
         } catch (s3Error) {
-          console.error("S3 upload failed, will continue with compressed version:", s3Error);
+          console.error(
+            "❌ S3 upload failed, will continue with compressed version:",
+            s3Error
+          );
           setUploadStatus(`S3 upload failed, using compressed version...`);
         }
+      } else {
+        console.log(`⚠️ S3 not configured - video ${recordingNumber} will only be compressed`);
       }
-      
+
       setUploadStatus(`Compressing video ${recordingNumber}...`);
 
       // Compress video for API backup
