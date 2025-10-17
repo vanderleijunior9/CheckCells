@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createTest } from "../services/api";
+import { uploadVideoToS3, generateS3FileName } from "../services/s3Service";
+import { isS3Configured } from "../config/s3Config";
 
 interface FormData {
   scientist?: string;
@@ -78,9 +80,13 @@ const CameraView = () => {
       setShowPreview(false);
       const newCount = recordedCount + 1;
       setRecordedCount(newCount);
+
+      // Clean up preview URL and blob
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
+        setPreviewUrl("");
       }
+      setRecordedBlob(null);
 
       // Show prompt to record another if not at max
       if (newCount < MAX_RECORDINGS) {
@@ -107,6 +113,12 @@ const CameraView = () => {
   const handleRecordAnother = () => {
     setShowRecordAnotherPrompt(false);
     setUploadStatus("");
+
+    // Clean up previous recording state
+    setRecordedBlob(null);
+    setPreviewUrl("");
+    setShowPreview(false);
+
     // Ready to record again
   };
 
@@ -263,20 +275,48 @@ const CameraView = () => {
   const uploadVideoToAPI = async (videoBlob: Blob, recordingNumber: number) => {
     try {
       setUploading(true);
+      
+      let s3Url = "";
+      
+      // Upload original video to S3 if configured
+      if (isS3Configured()) {
+        setUploadStatus(`Uploading video ${recordingNumber} to S3...`);
+        
+        try {
+          const fileName = generateS3FileName(
+            formData.testId || "unknown",
+            recordingNumber
+          );
+          
+          const metadata = {
+            scientist: formData.scientist || "",
+            testId: formData.testId || "",
+            recordingNumber: recordingNumber.toString(),
+          };
+          
+          s3Url = await uploadVideoToS3(videoBlob, fileName, metadata);
+          console.log(`Video ${recordingNumber} uploaded to S3:`, s3Url);
+        } catch (s3Error) {
+          console.error("S3 upload failed, will continue with compressed version:", s3Error);
+          setUploadStatus(`S3 upload failed, using compressed version...`);
+        }
+      }
+      
       setUploadStatus(`Compressing video ${recordingNumber}...`);
 
-      // Compress video first
+      // Compress video for API backup
       const compressedBlob = await compressVideo(videoBlob);
 
-      setUploadStatus(`Uploading video ${recordingNumber}...`);
+      setUploadStatus(`Uploading metadata ${recordingNumber}...`);
 
       // Convert compressed blob to text
       const text = await compressedBlob.text();
 
-      // Prepare data payload with user inputs + video
+      // Prepare data payload with user inputs + video info
       const dataToUpload = {
         name: "Video Recording",
-        video: text,
+        video: text, // Compressed video as backup
+        s3Url: s3Url, // S3 URL of original video
         // User-inputted information from form
         scientist: formData.scientist || "",
         testId: formData.testId || "",
@@ -297,7 +337,8 @@ const CameraView = () => {
         dilution: dataToUpload.delution,
         recordingNumber: dataToUpload.recordingNumber,
         timestamp: dataToUpload.timestamp,
-        videoSize: `${(text.length / 1024).toFixed(2)} KB`,
+        s3Url: s3Url || "Not configured",
+        compressedVideoSize: `${(text.length / 1024).toFixed(2)} KB`,
       });
 
       // Upload to API - single POST with all data combined
