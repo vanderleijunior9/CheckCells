@@ -1,6 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+interface FormField {
+  id: string;
+  label: string;
+  placeholder: string;
+  type: string;
+  isInteger?: boolean;
+}
+
 export const Newtestpage = () => {
   const location = useLocation();
   const [form, setForm] = useState(
@@ -17,7 +25,22 @@ export const Newtestpage = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setForm((prev: any) => ({ ...prev, [id]: value }));
+
+    // Enforce validation for numeric fields
+    if (["volume", "days"].includes(id)) {
+      // Allow empty string or only positive integers (remove non-digit characters)
+      const integerValue = value.replace(/[^0-9]/g, "");
+      setForm((prev: any) => ({ ...prev, [id]: integerValue }));
+    } else if (id === "dilution") {
+      // Allow integers and floats (digits and one decimal point)
+      const floatValue = value
+        .replace(/[^0-9.]/g, "")
+        .replace(/(\..*)\./g, "$1");
+      setForm((prev: any) => ({ ...prev, [id]: floatValue }));
+    } else {
+      setForm((prev: any) => ({ ...prev, [id]: value }));
+    }
+
     setError(""); // clear error when typing
   };
 
@@ -30,6 +53,25 @@ export const Newtestpage = () => {
       setError(`⚠️ Please complete all fields before continuing.`);
       return;
     }
+
+    // Validate that volume and days are valid integers, dilution is a valid number
+    const volume = parseInt(form.volume);
+    const days = parseInt(form.days);
+    const dilution = parseFloat(form.dilution);
+
+    if (isNaN(volume) || volume <= 0) {
+      setError("⚠️ Volume must be a valid positive integer.");
+      return;
+    }
+    if (isNaN(days) || days < 0) {
+      setError("⚠️ Days must be a valid non-negative integer.");
+      return;
+    }
+    if (isNaN(dilution) || dilution <= 0) {
+      setError("⚠️ Dilution must be a valid positive number.");
+      return;
+    }
+
     navigate("/started-test", { state: form });
   };
 
@@ -44,20 +86,37 @@ export const Newtestpage = () => {
     setError("");
   };
 
-  const formFields = [
+  const formFields: FormField[] = [
     {
       id: "scientist",
       label: "Technologist Name/ID",
       placeholder: "First and last name or ID",
+      type: "text",
     },
-    { id: "testId", label: "Test ID", placeholder: "Enter test ID" },
-    { id: "volume", label: "Volume", placeholder: "mL/g" },
+    {
+      id: "testId",
+      label: "Test ID",
+      placeholder: "Enter test ID",
+      type: "text",
+    },
+    {
+      id: "volume",
+      label: "Volume",
+      placeholder: "mL/g",
+      type: "text",
+    },
     {
       id: "days",
       label: "Days Since Previous Ejaculation",
       placeholder: "Enter number",
+      type: "text",
     },
-    { id: "dilution", label: "Dilution", placeholder: "Value" },
+    {
+      id: "dilution",
+      label: "Dilution",
+      placeholder: "Value (e.g., 1.5)",
+      type: "text",
+    },
   ];
 
   return (
@@ -86,10 +145,16 @@ export const Newtestpage = () => {
             </label>
             <input
               id={field.id}
+              type={field.type}
               placeholder={field.placeholder}
               value={form[field.id]}
               onChange={handleChange}
               autoComplete="off"
+              inputMode={
+                ["volume", "days", "dilution"].includes(field.id)
+                  ? "decimal"
+                  : "text"
+              }
               className={`w-full px-4 py-2 border ${
                 error && form[field.id].trim() === ""
                   ? "border-red-500"

@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { RiLogoutCircleLine } from "react-icons/ri";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useFormOptions } from "./FormOptionContext";
+import { useAuth } from "../contexts/AuthContext";
 
 const Navbar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { selectedOptions } = useFormOptions();
+  const { logout, user } = useAuth();
   const [totalTests, setTotalTests] = useState(128); // Default value, will be updated from API
 
   // Future API call - uncomment when API is ready
@@ -31,6 +34,11 @@ const Navbar = () => {
     return "All Tests"; // default
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
   return (
     <nav className="flex justify-between items-center py-4 border-b border-gray-200 ">
       <div className="pl-4">
@@ -47,11 +55,19 @@ const Navbar = () => {
         )}
       </div>
       <div className="flex items-center gap-4 pr-4">
+        {user && (
+          <div className="text-sm text-gray-700 hidden md:block">
+            Welcome, <span className="font-semibold">{user.name}</span>
+          </div>
+        )}
         <button className="relative text-gray-500 hover:text-gray-700 transition-colors">
           <Bell size={20} className="" />
           {/* <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span> */}
         </button>
-        <button className="bg-washed-white hover:bg-gray-300 text-slate-900 py-2 px-4 rounded-lg flex items-center">
+        <button
+          onClick={handleLogout}
+          className="bg-washed-white hover:bg-gray-300 text-slate-900 py-2 px-4 rounded-lg flex items-center transition-colors"
+        >
           <RiLogoutCircleLine className="mr-2" />
           Logout
         </button>
@@ -61,4 +77,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

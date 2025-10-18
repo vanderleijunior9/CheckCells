@@ -2,12 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  ChevronUp,
-  Info,
-  List,
-  Check,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight,
+  Maximize,
+  Play,
+  Pause,
 } from "lucide-react";
 import { fetchTestComments, updateTestComments } from "../services/api";
 
@@ -35,7 +34,6 @@ const TestDetails = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [testData, setTestData] = useState<TestData | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditingComments, setIsEditingComments] = useState(false);
   const [comments, setComments] = useState("");
   const [tempComments, setTempComments] = useState("");
@@ -45,6 +43,9 @@ const TestDetails = () => {
   const [videos, setVideos] = useState<string[]>([]);
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [loadingVideos, setLoadingVideos] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     // Try to get test data from sessionStorage first, then from location.state
@@ -63,9 +64,9 @@ const TestDetails = () => {
     }
   }, [location.state, navigate]);
 
-  // Fetch full test details from API
+  // Fetch test parameters/metadata from API
   useEffect(() => {
-    const loadFullDetails = async () => {
+    const loadFullDetailsParameters = async () => {
       if (testData?.testId) {
         try {
           setLoadingDetails(true);
@@ -78,6 +79,11 @@ const TestDetails = () => {
             id = testIdStr.replace("TST-", "").replace(/^0+/, "") || "1";
           }
 
+          console.log(
+            `🔍 Fetching test parameters for test ID: ${testIdStr} (API ID: ${id})`
+          );
+
+          // Fetch test details/parameters
           const response = await fetch(
             `https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters/${id}`
           );
@@ -91,21 +97,76 @@ const TestDetails = () => {
               delution: fullData.delution,
             }));
 
-            // Check if video exists and add to videos array
-            if (fullData.video) {
-              setVideos([fullData.video]);
-            }
+            console.log("📄 Test parameters loaded:", {
+              volume: fullData.volume,
+              days: fullData.days,
+              delution: fullData.delution,
+            });
+          } else {
+            console.error("Failed to fetch test parameters:", response.status);
           }
         } catch (error) {
-          console.error("Failed to load full test details:", error);
+          console.error("Failed to load test parameters:", error);
         } finally {
           setLoadingDetails(false);
+        }
+      }
+    };
+
+    loadFullDetailsParameters();
+  }, [testData?.testId]);
+
+  // Fetch videos from local server
+  useEffect(() => {
+    const loadVideoDetails = async () => {
+      if (testData?.testId) {
+        try {
+          setLoadingVideos(true);
+          const testIdStr = String(testData.testId);
+
+          console.log(
+            `🎥 Fetching videos from local server for test: ${testIdStr}`
+          );
+
+          const API_BASE_URL = "http://localhost:3001";
+          const videosResponse = await fetch(
+            `${API_BASE_URL}/api/upload/videos/${testIdStr}`
+          );
+
+          if (videosResponse.ok) {
+            const videoData = await videosResponse.json();
+            console.log(
+              `📹 Found ${videoData.count} videos for test ${testIdStr}`
+            );
+
+            // Extract video URLs
+            const videoUrls = videoData.videos.map((video: any) => video.url);
+
+            console.log(
+              `✅ Loaded ${videoUrls.length} video URLs from local server:`,
+              videoUrls
+            );
+
+            if (videoUrls.length > 0) {
+              setVideos(videoUrls);
+            } else {
+              console.log("⚠️ No videos found on local server for this test");
+            }
+          } else {
+            console.error(
+              "Failed to fetch videos from local server:",
+              videosResponse.status
+            );
+          }
+        } catch (error) {
+          console.error("Failed to load video details:", error);
+        } finally {
           setLoadingVideos(false);
         }
       }
     };
 
-    loadFullDetails();
+    loadVideoDetails();
   }, [testData?.testId]);
 
   // Fetch comments when testData is available
@@ -172,10 +233,43 @@ const TestDetails = () => {
 
   const handlePreviousVideo = () => {
     setCurrentVideoIndex((prev) => (prev > 0 ? prev - 1 : videos.length - 1));
+    setIsPlaying(false);
   };
 
   const handleNextVideo = () => {
     setCurrentVideoIndex((prev) => (prev < videos.length - 1 ? prev + 1 : 0));
+    setIsPlaying(false);
+  };
+
+  const togglePlayPause = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (videoRef.current) {
+      if (!isFullscreen) {
+        if (videoRef.current.requestFullscreen) {
+          videoRef.current.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+      setIsFullscreen(!isFullscreen);
+    }
+  };
+
+  const handleVideoClick = (index: number) => {
+    setCurrentVideoIndex(index);
+    setIsPlaying(false);
   };
 
   return (
@@ -260,48 +354,172 @@ const TestDetails = () => {
 
             {/* Video Slideshow */}
             {videos.length > 0 && (
-              <div className="bg-white p-6 rounded-lg">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Recorded Video
-                </h2>
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Test Videos
+                  </h2>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    {videos.length} {videos.length === 1 ? "video" : "videos"}
+                  </span>
+                </div>
+
                 {loadingVideos ? (
-                  <div className="flex items-center justify-center py-12">
-                    <span className="text-gray-400">Loading videos...</span>
+                  <div className="flex items-center justify-center py-12 bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-check mx-auto mb-3"></div>
+                      <span className="text-gray-500">Loading videos...</span>
+                    </div>
                   </div>
                 ) : (
-                  <div className="relative">
-                    {/* Video Player */}
-                    <video
-                      src={videos[currentVideoIndex]}
-                      controls
-                      className="w-full rounded-lg bg-black"
-                      style={{ maxHeight: "400px" }}
-                    />
+                  <div className="space-y-4">
+                    {/* Main Video Player */}
+                    <div className="relative bg-black rounded-lg overflow-hidden">
+                      <video
+                        ref={videoRef}
+                        src={videos[currentVideoIndex]}
+                        controls
+                        className="w-full rounded-lg"
+                        style={{ maxHeight: "500px" }}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                      />
+
+                      {/* Custom Controls Overlay */}
+                      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={togglePlayPause}
+                            className="bg-white/90 hover:bg-white text-gray-900 p-2 rounded-full transition-all shadow-lg"
+                            title={isPlaying ? "Pause" : "Play"}
+                          >
+                            {isPlaying ? (
+                              <Pause size={20} />
+                            ) : (
+                              <Play size={20} />
+                            )}
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={toggleFullscreen}
+                          className="bg-white/90 hover:bg-white text-gray-900 p-2 rounded-full transition-all shadow-lg"
+                          title="Fullscreen"
+                        >
+                          <Maximize size={20} />
+                        </button>
+                      </div>
+
+                      {/* Video Counter Badge */}
+                      <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        {currentVideoIndex + 1} / {videos.length}
+                      </div>
+                    </div>
 
                     {/* Navigation Controls */}
                     {videos.length > 1 && (
-                      <div className="flex items-center justify-between mt-4">
+                      <div className="flex items-center justify-between gap-4">
                         <button
                           onClick={handlePreviousVideo}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                          disabled={currentVideoIndex === 0}
+                          className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 rounded-lg transition-colors font-medium disabled:cursor-not-allowed"
                         >
                           <ChevronLeftIcon size={20} />
                           Previous
                         </button>
 
-                        <span className="text-gray-600">
-                          {currentVideoIndex + 1} / {videos.length}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500">Video</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {currentVideoIndex + 1}
+                          </span>
+                          <span className="text-sm text-gray-500">of</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {videos.length}
+                          </span>
+                        </div>
 
                         <button
                           onClick={handleNextVideo}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                          disabled={currentVideoIndex === videos.length - 1}
+                          className="flex items-center gap-2 px-5 py-2.5 bg-green-check hover:bg-teal-700 disabled:bg-gray-50 disabled:text-gray-400 text-white rounded-lg transition-colors font-medium disabled:cursor-not-allowed"
                         >
                           Next
                           <ChevronRight size={20} />
                         </button>
                       </div>
                     )}
+
+                    {/* Video Thumbnails Grid */}
+                    {videos.length > 1 && (
+                      <div className="pt-4 border-t border-gray-200">
+                        <h3 className="text-sm font-medium text-gray-700 mb-3">
+                          All Videos
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                          {videos.map((video, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleVideoClick(index)}
+                              className={`relative rounded-lg overflow-hidden aspect-video border-2 transition-all ${
+                                currentVideoIndex === index
+                                  ? "border-green-check shadow-lg scale-105"
+                                  : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+                              }`}
+                            >
+                              <video
+                                src={video}
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                              />
+                              <div
+                                className={`absolute inset-0 flex items-center justify-center ${
+                                  currentVideoIndex === index
+                                    ? "bg-green-check/20"
+                                    : "bg-black/30 hover:bg-black/20"
+                                }`}
+                              >
+                                {currentVideoIndex === index ? (
+                                  <div className="bg-green-check text-white rounded-full p-2">
+                                    <Play size={16} fill="currentColor" />
+                                  </div>
+                                ) : (
+                                  <div className="bg-white/90 text-gray-900 rounded-full p-2">
+                                    <Play size={16} />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                                {index + 1}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Video Info */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            Recording {currentVideoIndex + 1}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Test ID: {testData.testId}
+                          </p>
+                        </div>
+                        <a
+                          href={videos[currentVideoIndex]}
+                          download={`${testData.testId}_video_${
+                            currentVideoIndex + 1
+                          }.webm`}
+                          className="text-sm text-green-check hover:text-teal-700 font-medium underline"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

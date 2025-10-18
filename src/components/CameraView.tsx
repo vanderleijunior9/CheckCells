@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createTest } from "../services/api";
-import { uploadVideoToS3, generateS3FileName } from "../services/s3Service";
-import { isS3Configured } from "../config/s3Config";
+import { uploadVideo } from "../services/uploadService";
 
 interface FormData {
   scientist?: string;
@@ -34,8 +33,10 @@ const CameraView = () => {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>("");
   const [acceptedVideos, setAcceptedVideos] = useState<Blob[]>([]);
+  const [totalVideoDuration, setTotalVideoDuration] = useState(0);
   const MAX_RECORDINGS = 5;
   const MAX_RECORDING_DURATION = 15; // Maximum recording duration in seconds
+  const REQUIRED_TOTAL_DURATION = 15; // Required total duration across all videos in seconds
 
   useEffect(() => {
     let stream: MediaStream;
@@ -57,6 +58,26 @@ const CameraView = () => {
     };
   }, [navigate]);
 
+  // Helper function to get duration of a video blob
+  const getVideoDuration = (blob: Blob): Promise<number> => {
+    return new Promise((resolve) => {
+      const videoUrl = URL.createObjectURL(blob);
+      const video = document.createElement("video");
+      video.src = videoUrl;
+
+      video.onloadedmetadata = () => {
+        const duration = video.duration;
+        URL.revokeObjectURL(videoUrl);
+        resolve(duration);
+      };
+
+      video.onerror = () => {
+        URL.revokeObjectURL(videoUrl);
+        resolve(0); // Return 0 if error
+      };
+    });
+  };
+
   const handleStop = () => {
     if (isRecording && mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
@@ -71,11 +92,20 @@ const CameraView = () => {
     navigate(-1);
   };
 
-  const handleAcceptRecording = () => {
+  const handleAcceptRecording = async () => {
     if (recordedBlob) {
+      // Get duration of the current video
+      const currentDuration = await getVideoDuration(recordedBlob);
+      const newTotalDuration = totalVideoDuration + currentDuration;
+
       // Store the video locally, don't upload to API yet
       setAcceptedVideos((prev) => [...prev, recordedBlob]);
-      setUploadStatus("Recording accepted!");
+      setTotalVideoDuration(newTotalDuration);
+      setUploadStatus(
+        `Recording accepted! Total: ${Math.round(
+          newTotalDuration
+        )}s / ${REQUIRED_TOTAL_DURATION}s`
+      );
 
       setShowPreview(false);
       const newCount = recordedCount + 1;
@@ -88,14 +118,26 @@ const CameraView = () => {
       }
       setRecordedBlob(null);
 
-      // Show prompt to record another if not at max
-      if (newCount < MAX_RECORDINGS) {
-        setShowRecordAnotherPrompt(true);
-      } else {
+      // Condition-based logic:
+      // 1. If first video, automatically prompt for another (no finish option)
+      // 2. If second or later video, check if total duration >= 15 seconds
+      //    - If yes, show finish option
+      //    - If no, prompt for another video (no finish option if < 15s)
+
+      if (newCount >= MAX_RECORDINGS) {
         // Max recordings reached, show final preview
         setTimeout(() => {
           handleFinishRecording();
         }, 2000);
+      } else if (newCount === 1) {
+        // First video: automatically prompt for another without "No, Finish" option
+        setShowRecordAnotherPrompt(true);
+      } else if (newTotalDuration >= REQUIRED_TOTAL_DURATION) {
+        // Total duration reached, show option to finish or record more
+        setShowRecordAnotherPrompt(true);
+      } else {
+        // Still need more duration, automatically prompt for another
+        setShowRecordAnotherPrompt(true);
       }
     }
   };
@@ -152,17 +194,12 @@ const CameraView = () => {
         dilution: formData.dilution,
       });
       console.log(`Number of videos: ${acceptedVideos.length}`);
+      console.log(`Local Server Upload: ENABLED ✅`);
       console.log(
-        `S3 Upload: ${isS3Configured() ? "ENABLED ✅" : "DISABLED ❌"}`
+        `Videos will be uploaded to: http://localhost:3001/uploads/videos/${
+          formData.testId || "unknown"
+        }/`
       );
-      if (isS3Configured()) {
-        console.log(`S3 Bucket: testingcheckcells`);
-        console.log(
-          `Videos will be uploaded to: s3://testingcheckcells/videos/${
-            formData.testId || "unknown"
-          }/`
-        );
-      }
       console.log("===========================");
 
       // Upload all accepted videos to API first
@@ -287,61 +324,54 @@ const CameraView = () => {
     try {
       setUploading(true);
 
-      let s3Url = "";
+      let videoUrl = "";
 
-      // Upload original video to S3 if configured
-      if (isS3Configured()) {
-        setUploadStatus(`Uploading video ${recordingNumber} to S3...`);
-        console.log(
-          `📤 Uploading video ${recordingNumber} to S3 bucket: testingcheckcells`
-        );
+      // Upload video to local server
+      setUploadStatus(`Uploading video ${recordingNumber}...`);
+      console.log(`📤 Uploading video ${recordingNumber} to local server`);
 
-        try {
-          const fileName = generateS3FileName(
-            formData.testId || "unknown",
-            recordingNumber
-          );
-
-          const metadata = {
-            scientist: formData.scientist || "",
-            testId: formData.testId || "",
+      try {
+        const response = await uploadVideo(
+          videoBlob,
+          {
+            testId: formData.testId || "unknown",
             recordingNumber: recordingNumber.toString(),
-          };
-
-          console.log(`📁 S3 File path: ${fileName}`);
-          s3Url = await uploadVideoToS3(videoBlob, fileName, metadata);
-          console.log(
-            `✅ Video ${recordingNumber} uploaded successfully to S3!`
-          );
-          console.log(`🔗 S3 URL: ${s3Url}`);
-        } catch (s3Error) {
-          console.error(
-            "❌ S3 upload failed, will continue with compressed version:",
-            s3Error
-          );
-          setUploadStatus(`S3 upload failed, using compressed version...`);
-        }
-      } else {
-        console.log(
-          `⚠️ S3 not configured - video ${recordingNumber} will only be compressed`
+            scientist: formData.scientist || "unknown",
+          },
+          (progress) => {
+            setUploadStatus(`Uploading video ${recordingNumber}: ${progress}%`);
+            console.log(`📊 Upload progress: ${progress}%`);
+          }
         );
+
+        if (response.success && response.file) {
+          videoUrl = response.file.url;
+          console.log(`✅ Video ${recordingNumber} uploaded successfully!`);
+          console.log(`🔗 URL: ${videoUrl}`);
+          setUploadStatus(`Video ${recordingNumber} uploaded!`);
+        } else {
+          throw new Error("Upload failed: No file URL returned");
+        }
+      } catch (uploadError) {
+        console.error(
+          `❌ Server upload failed for video ${recordingNumber}:`,
+          uploadError
+        );
+        setUploadStatus(`Upload failed for video ${recordingNumber}`);
+        throw uploadError; // Re-throw to handle in parent
       }
 
-      setUploadStatus(`Compressing video ${recordingNumber}...`);
+      setUploadStatus(`Preparing metadata ${recordingNumber}...`);
 
-      // Compress video for API backup
+      // Compress video for API backup (optional)
       const compressedBlob = await compressVideo(videoBlob);
-
-      setUploadStatus(`Uploading metadata ${recordingNumber}...`);
-
-      // Convert compressed blob to text
       const text = await compressedBlob.text();
 
-      // Prepare data payload with user inputs + video info
+      // Prepare data payload with user inputs + video URL
       const dataToUpload = {
         name: "Video Recording",
         video: text, // Compressed video as backup
-        s3Url: s3Url, // S3 URL of original video
+        videoUrl: videoUrl, // Local server URL
         // User-inputted information from form
         scientist: formData.scientist || "",
         testId: formData.testId || "",
@@ -354,15 +384,14 @@ const CameraView = () => {
       };
 
       // Log the data being uploaded (for debugging)
-      console.log("Uploading data to API:", {
+      console.log("Saving test metadata to API:", {
         scientist: dataToUpload.scientist,
         testId: dataToUpload.testId,
         volume: dataToUpload.volume,
         days: dataToUpload.days,
         dilution: dataToUpload.delution,
         recordingNumber: dataToUpload.recordingNumber,
-        timestamp: dataToUpload.timestamp,
-        s3Url: s3Url || "Not configured",
+        videoUrl: videoUrl,
         compressedVideoSize: `${(text.length / 1024).toFixed(2)} KB`,
       });
 
@@ -504,7 +533,21 @@ const CameraView = () => {
       {/* Recording Counter */}
       {!showRecordAnotherPrompt && !showPreview && (
         <div className="mb-2 text-gray-600 text-sm font-medium">
-          Videos recorded: {recordedCount}/{MAX_RECORDINGS}
+          <div>
+            Videos recorded: {recordedCount}/{MAX_RECORDINGS}
+          </div>
+          {recordedCount > 0 && (
+            <div
+              className={`mt-1 ${
+                totalVideoDuration >= REQUIRED_TOTAL_DURATION
+                  ? "text-green-600"
+                  : "text-orange-600"
+              }`}
+            >
+              Total duration: {Math.round(totalVideoDuration)}s /{" "}
+              {REQUIRED_TOTAL_DURATION}s
+            </div>
+          )}
         </div>
       )}
 
@@ -597,7 +640,10 @@ const CameraView = () => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {acceptedVideos.map((videoBlob, index) => (
-                    <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div
+                      key={index}
+                      className="bg-gray-50 rounded-lg p-3 border border-gray-200"
+                    >
                       <p className="text-sm font-medium text-gray-700 mb-2">
                         Recording {index + 1}
                       </p>
@@ -638,18 +684,27 @@ const CameraView = () => {
           <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
             <div className="text-6xl mb-4">✓</div>
             <h2 className="text-2xl font-bold text-green-800 mb-4">
-              Video Uploaded Successfully!
+              Video Accepted!
             </h2>
             <p className="text-green-700 mb-2">
               You have recorded {recordedCount} out of {MAX_RECORDINGS} videos.
             </p>
-            {recordedCount < MAX_RECORDINGS ? (
+            <p className="text-green-700 mb-2 font-semibold">
+              Total Duration: {Math.round(totalVideoDuration)}s /{" "}
+              {REQUIRED_TOTAL_DURATION}s
+            </p>
+            {recordedCount === 1 ? (
               <p className="text-green-600 text-lg font-medium">
-                Would you like to record another video?
+                Please record at least one more video.
+              </p>
+            ) : totalVideoDuration < REQUIRED_TOTAL_DURATION ? (
+              <p className="text-orange-600 text-lg font-medium">
+                Need {Math.round(REQUIRED_TOTAL_DURATION - totalVideoDuration)}s
+                more to reach {REQUIRED_TOTAL_DURATION}s total.
               </p>
             ) : (
               <p className="text-green-600 text-lg font-medium">
-                You've reached the maximum number of recordings!
+                Minimum duration reached! Record more or finish the test.
               </p>
             )}
           </div>
@@ -708,14 +763,21 @@ const CameraView = () => {
               className="bg-green-check hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold shadow transition text-lg"
               onClick={handleRecordAnother}
             >
-              Yes, Record Another
+              {recordedCount === 1 ||
+              totalVideoDuration < REQUIRED_TOTAL_DURATION
+                ? "Record Another Video"
+                : "Yes, Record Another"}
             </button>
-            <button
-              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold shadow transition text-lg"
-              onClick={handleFinishRecording}
-            >
-              No, Finish
-            </button>
+            {/* Only show "No, Finish" button if we have at least 2 videos AND reached minimum duration */}
+            {recordedCount > 1 &&
+              totalVideoDuration >= REQUIRED_TOTAL_DURATION && (
+                <button
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold shadow transition text-lg"
+                  onClick={handleFinishRecording}
+                >
+                  No, Finish
+                </button>
+              )}
           </>
         ) : showPreview ? (
           // Preview mode buttons
