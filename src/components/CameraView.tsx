@@ -12,7 +12,6 @@ interface FormData {
   dilution?: string;
 }
 
-
 const CameraView = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -265,7 +264,6 @@ const CameraView = () => {
     navigate("/new-test", { state: formData });
   };
 
-
   const uploadVideoToAPI = async (videoBlob: Blob, recordingNumber: number) => {
     try {
       setUploading(true);
@@ -283,10 +281,10 @@ const CameraView = () => {
 
         // Upload video directly to S3
         const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
+          method: "PUT",
           body: videoBlob,
           headers: {
-            'Content-Type': videoBlob.type,
+            "Content-Type": videoBlob.type,
           },
         });
 
@@ -294,12 +292,16 @@ const CameraView = () => {
           // Extract the S3 URL from the upload URL
           const url = new URL(uploadUrl);
           videoUrl = `https://${url.hostname}${url.pathname}`;
-          
-          console.log(`✅ Video ${recordingNumber} uploaded to S3 successfully!`);
+
+          console.log(
+            `✅ Video ${recordingNumber} uploaded to S3 successfully!`
+          );
           console.log(`🔗 S3 URL: ${videoUrl}`);
           setUploadStatus(`Video ${recordingNumber} uploaded to S3!`);
         } else {
-          throw new Error(`S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          throw new Error(
+            `S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`
+          );
         }
       } catch (uploadError) {
         console.error(
