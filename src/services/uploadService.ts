@@ -1,8 +1,3 @@
-/**
- * Upload Service - Handles video uploads to the backend server
- * The backend server uses Multer to process uploads and forwards to S3
- */
-
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 interface UploadResponse {

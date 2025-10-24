@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createTest } from "../services/api";
 import { uploadVideo } from "../services/uploadService";
+import { generateUploadUrl } from "../services/simple_s3";
 
 interface FormData {
   scientist?: string;
@@ -10,6 +11,7 @@ interface FormData {
   days?: string;
   dilution?: string;
 }
+
 
 const CameraView = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -263,62 +265,6 @@ const CameraView = () => {
     navigate("/new-test", { state: formData });
   };
 
-  const compressVideo = async (videoBlob: Blob): Promise<Blob> => {
-    // Create a video element to get frames
-    const videoUrl = URL.createObjectURL(videoBlob);
-    const video = document.createElement("video");
-    video.src = videoUrl;
-
-    return new Promise((resolve) => {
-      video.onloadedmetadata = async () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        // Aggressive resolution reduction for smaller file size
-        const scale = 0.3; // 30% of original size (reduced from 50%)
-        canvas.width = video.videoWidth * scale;
-        canvas.height = video.videoHeight * scale;
-
-        // Capture frames at very low rate
-        const frames: string[] = [];
-        const fps = 2; // Capture 2 frames per second (reduced from 5)
-        const duration = video.duration;
-        const frameInterval = 1 / fps;
-
-        for (
-          let time = 0;
-          time < Math.min(duration, MAX_RECORDING_DURATION);
-          time += frameInterval
-        ) {
-          video.currentTime = time;
-          await new Promise((r) => {
-            video.onseeked = r;
-          });
-
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            // Very low quality JPEG for much smaller size
-            const frame = canvas.toDataURL("image/jpeg", 0.3);
-            frames.push(frame);
-          }
-        }
-
-        // Store as JSON with metadata, limit frames based on fps and duration
-        // At 2 fps for 15 seconds = max 30 frames
-        const maxFrames = Math.ceil(fps * MAX_RECORDING_DURATION);
-        const compressedData = JSON.stringify({
-          frames: frames.slice(0, maxFrames),
-          width: canvas.width,
-          height: canvas.height,
-          duration: Math.min(duration, MAX_RECORDING_DURATION),
-        });
-
-        const blob = new Blob([compressedData], { type: "application/json" });
-        URL.revokeObjectURL(videoUrl);
-        resolve(blob);
-      };
-    });
-  };
 
   const uploadVideoToAPI = async (videoBlob: Blob, recordingNumber: number) => {
     try {
@@ -326,52 +272,50 @@ const CameraView = () => {
 
       let videoUrl = "";
 
-      // Upload video to local server
-      setUploadStatus(`Uploading video ${recordingNumber}...`);
-      console.log(`📤 Uploading video ${recordingNumber} to local server`);
+      // Upload video to S3
+      setUploadStatus(`Uploading video ${recordingNumber} to S3...`);
+      console.log(`📤 Uploading video ${recordingNumber} to S3`);
 
       try {
-        const response = await uploadVideo(
-          videoBlob,
-          {
-            testId: formData.testId || "unknown",
-            recordingNumber: recordingNumber.toString(),
-            scientist: formData.scientist || "unknown",
-          },
-          (progress) => {
-            setUploadStatus(`Uploading video ${recordingNumber}: ${progress}%`);
-            console.log(`📊 Upload progress: ${progress}%`);
-          }
-        );
+        // Get S3 upload URL
+        const uploadUrl = await generateUploadUrl();
+        console.log(`🔗 S3 Upload URL generated for video ${recordingNumber}`);
 
-        if (response.success && response.file) {
-          videoUrl = response.file.url;
-          console.log(`✅ Video ${recordingNumber} uploaded successfully!`);
-          console.log(`🔗 URL: ${videoUrl}`);
-          setUploadStatus(`Video ${recordingNumber} uploaded!`);
+        // Upload video directly to S3
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: videoBlob,
+          headers: {
+            'Content-Type': videoBlob.type,
+          },
+        });
+
+        if (uploadResponse.ok) {
+          // Extract the S3 URL from the upload URL
+          const url = new URL(uploadUrl);
+          videoUrl = `https://${url.hostname}${url.pathname}`;
+          
+          console.log(`✅ Video ${recordingNumber} uploaded to S3 successfully!`);
+          console.log(`🔗 S3 URL: ${videoUrl}`);
+          setUploadStatus(`Video ${recordingNumber} uploaded to S3!`);
         } else {
-          throw new Error("Upload failed: No file URL returned");
+          throw new Error(`S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
         }
       } catch (uploadError) {
         console.error(
-          `❌ Server upload failed for video ${recordingNumber}:`,
+          `❌ S3 upload failed for video ${recordingNumber}:`,
           uploadError
         );
-        setUploadStatus(`Upload failed for video ${recordingNumber}`);
+        setUploadStatus(`S3 upload failed for video ${recordingNumber}`);
         throw uploadError; // Re-throw to handle in parent
       }
 
       setUploadStatus(`Preparing metadata ${recordingNumber}...`);
 
-      // Compress video for API backup (optional)
-      const compressedBlob = await compressVideo(videoBlob);
-      const text = await compressedBlob.text();
-
-      // Prepare data payload with user inputs + video URL
+      // Prepare data payload with user inputs + S3 video URL
       const dataToUpload = {
         name: "Video Recording",
-        video: text, // Compressed video as backup
-        videoUrl: videoUrl, // Local server URL
+        videoUrl: videoUrl, // S3 URL
         // User-inputted information from form
         scientist: formData.scientist || "",
         testId: formData.testId || "",
@@ -392,7 +336,7 @@ const CameraView = () => {
         dilution: dataToUpload.delution,
         recordingNumber: dataToUpload.recordingNumber,
         videoUrl: videoUrl,
-        compressedVideoSize: `${(text.length / 1024).toFixed(2)} KB`,
+        videoSize: `${(videoBlob.size / 1024 / 1024).toFixed(2)} MB`,
       });
 
       // Upload to API - single POST with all data combined
