@@ -18,7 +18,9 @@ export async function generateUploadUrl() {
   // Generate random bytes using Web Crypto API (browser compatible)
   const array = new Uint8Array(16);
   crypto.getRandomValues(array);
-  const imageName = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  const imageName = Array.from(array, (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("");
 
   const command = new PutObjectCommand({
     Bucket: bucketName,
