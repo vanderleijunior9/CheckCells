@@ -9,6 +9,7 @@ import {
   Pause,
 } from "lucide-react";
 import { fetchTestComments, updateTestComments } from "../services/api";
+import { listVideosFromS3 } from "../services/s3Service";
 
 interface TestData {
   diagnosticianName: string;
@@ -19,6 +20,7 @@ interface TestData {
   volume?: number;
   days?: number;
   delution?: number;
+  videoUrl?: string[]; // Array of video URLs from S3
 }
 
 // interface TestResult {
@@ -95,12 +97,14 @@ const TestDetails = () => {
               volume: fullData.volume,
               days: fullData.days,
               delution: fullData.delution,
+              videoUrl: fullData.videoUrl, // Include videoUrl from API
             }));
 
             console.log("📄 Test parameters loaded:", {
               volume: fullData.volume,
               days: fullData.days,
               delution: fullData.delution,
+              videoUrl: fullData.videoUrl,
             });
           } else {
             console.error("Failed to fetch test parameters:", response.status);
@@ -116,7 +120,7 @@ const TestDetails = () => {
     loadFullDetailsParameters();
   }, [testData?.testId]);
 
-  // Fetch videos from local server
+  // Fetch videos from API or AWS S3
   useEffect(() => {
     const loadVideoDetails = async () => {
       if (testData?.testId) {
@@ -124,39 +128,32 @@ const TestDetails = () => {
           setLoadingVideos(true);
           const testIdStr = String(testData.testId);
 
-          console.log(
-            `🎥 Fetching videos from local server for test: ${testIdStr}`
-          );
-
-          const API_BASE_URL = "http://localhost:3001";
-          const videosResponse = await fetch(
-            `${API_BASE_URL}/api/upload/videos/${testIdStr}`
-          );
-
-          if (videosResponse.ok) {
-            const videoData = await videosResponse.json();
+          // First, check if videoUrl is available from the API
+          if (testData.videoUrl && testData.videoUrl.length > 0) {
+            console.log(`🎥 Using video URLs from API for test: ${testIdStr}`);
             console.log(
-              `📹 Found ${videoData.count} videos for test ${testIdStr}`
+              `✅ Found ${testData.videoUrl.length} video URLs from API:`,
+              testData.videoUrl
+            );
+            setVideos(testData.videoUrl);
+          } else {
+            // Fallback to S3 if no videoUrl from API
+            console.log(
+              `🎥 No video URLs from API, fetching from AWS S3 for test: ${testIdStr}`
             );
 
-            // Extract video URLs
-            const videoUrls = videoData.videos.map((video: any) => video.url);
+            const videoUrls = await listVideosFromS3(testIdStr);
 
             console.log(
-              `✅ Loaded ${videoUrls.length} video URLs from local server:`,
+              `✅ Loaded ${videoUrls.length} video URLs from AWS S3:`,
               videoUrls
             );
 
             if (videoUrls.length > 0) {
               setVideos(videoUrls);
             } else {
-              console.log("⚠️ No videos found on local server for this test");
+              console.log("⚠️ No videos found in AWS S3 for this test");
             }
-          } else {
-            console.error(
-              "Failed to fetch videos from local server:",
-              videosResponse.status
-            );
           }
         } catch (error) {
           console.error("Failed to load video details:", error);
@@ -167,7 +164,7 @@ const TestDetails = () => {
     };
 
     loadVideoDetails();
-  }, [testData?.testId]);
+  }, [testData?.testId, testData?.videoUrl]);
 
   // Fetch comments when testData is available
   useEffect(() => {
@@ -183,8 +180,7 @@ const TestDetails = () => {
           setTempComments(fetchedComments || defaultComments);
         } catch (error) {
           console.error("Failed to load comments:", error);
-          const defaultComments =
-            "The semen sample was meticulously collected on May 15, 2025, at the CC Lab, where it will undergo thorough analysis to ensure accurate results and provide valuable insights.";
+          const defaultComments = "Defaut comment -- api not working";
           setComments(defaultComments);
           setTempComments(defaultComments);
         } finally {

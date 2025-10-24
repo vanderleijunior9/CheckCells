@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createTest } from "../services/api";
-import { uploadVideo } from "../services/uploadService";
 import { generateUploadUrl } from "../services/simple_s3";
+import { listVideosFromS3 } from "../services/s3Service";
 
 interface FormData {
   scientist?: string;
@@ -196,15 +196,9 @@ const CameraView = () => {
       });
       console.log(`Number of videos: ${acceptedVideos.length}`);
       console.log(`Local Server Upload: ENABLED ✅`);
-      console.log(
-        `Videos will be uploaded to: http://localhost:3001/uploads/videos/${
-          formData.testId || "unknown"
-        }/`
-      );
-      console.log("===========================");
 
       // Upload all accepted videos to API first
-      console.log(`Uploading ${acceptedVideos.length} videos to API...`);
+      console.log(`Uploading ${acceptedVideos.length} videos to aws...`);
       setUploadStatus(`Uploading videos (0/${acceptedVideos.length})...`);
 
       for (let i = 0; i < acceptedVideos.length; i++) {
@@ -212,6 +206,22 @@ const CameraView = () => {
           `Uploading videos (${i + 1}/${acceptedVideos.length})...`
         );
         await uploadVideoToAPI(acceptedVideos[i], i + 1);
+      }
+
+      setUploadStatus("Collecting video URLs from S3...");
+
+      // Get all video URLs from S3 for this test
+      let videoUrls: string[] = [];
+      try {
+        videoUrls = await listVideosFromS3(formData.testId);
+        console.log(
+          `📹 Found ${videoUrls.length} videos in S3 for test ${formData.testId}:`,
+          videoUrls
+        );
+      } catch (error) {
+        console.error("Failed to get video URLs from S3:", error);
+        // Continue with empty array if S3 fails
+        videoUrls = [];
       }
 
       setUploadStatus("Saving test information...");
@@ -226,9 +236,10 @@ const CameraView = () => {
         dateOfTest: new Date().toLocaleDateString(),
         testType: "All parameters",
         status: "Completed",
+        videoUrl: videoUrls, // Add video URLs to the test data
       };
 
-      console.log("Saving test to API:", testData);
+      console.log("Saving test to API with video URLs:", testData);
 
       // Post test data to API
       const result = await createTest(testData);
@@ -276,7 +287,9 @@ const CameraView = () => {
 
       try {
         // Get S3 upload URL
-        console.log(`🔗 Generating S3 upload URL for video ${recordingNumber}...`);
+        console.log(
+          `🔗 Generating S3 upload URL for video ${recordingNumber}...`
+        );
         const uploadUrl = await generateUploadUrl();
         console.log(`✅ S3 Upload URL generated for video ${recordingNumber}`);
 
@@ -302,11 +315,13 @@ const CameraView = () => {
           console.log(`🔗 S3 URL: ${videoUrl}`);
           setUploadStatus(`Video ${recordingNumber} uploaded to S3!`);
         } else {
-          const errorText = await uploadResponse.text().catch(() => "No error details");
+          const errorText = await uploadResponse
+            .text()
+            .catch(() => "No error details");
           console.error(`❌ S3 upload failed:`, {
             status: uploadResponse.status,
             statusText: uploadResponse.statusText,
-            errorText
+            errorText,
           });
           throw new Error(
             `S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`
@@ -317,7 +332,11 @@ const CameraView = () => {
           `❌ S3 upload failed for video ${recordingNumber}:`,
           uploadError
         );
-        setUploadStatus(`S3 upload failed for video ${recordingNumber}: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
+        setUploadStatus(
+          `S3 upload failed for video ${recordingNumber}: ${
+            uploadError instanceof Error ? uploadError.message : "Unknown error"
+          }`
+        );
         throw uploadError; // Re-throw to handle in parent
       }
 
@@ -347,7 +366,6 @@ const CameraView = () => {
         dilution: dataToUpload.delution,
         recordingNumber: dataToUpload.recordingNumber,
         videoUrl: videoUrl,
-        videoSize: `${(videoBlob.size / 1024 / 1024).toFixed(2)} MB`,
       });
 
       // Upload to API - single POST with all data combined
@@ -358,7 +376,7 @@ const CameraView = () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(dataToUpload),
+          // body: JSON.stringify(dataToUpload),
         }
       );
 
@@ -372,7 +390,7 @@ const CameraView = () => {
         );
         console.error(
           "404 Error: API endpoint not found. URL:",
-          "https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters"
+          "/api/parameters"
         );
       } else if (response.status === 413) {
         setUploadStatus(

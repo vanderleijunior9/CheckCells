@@ -7,6 +7,7 @@ interface TestData {
   volume?: number;
   days?: number;
   delution?: number;
+  videoUrl?: string[]; // Array of video URLs from S3
 }
 
 interface ApiParameter {
@@ -21,6 +22,7 @@ interface ApiParameter {
   testType?: string;
   status?: string;
   video?: string;
+  videoUrl?: string[]; // Array of video URLs from S3
 }
 
 // MockAPI endpoint
@@ -99,6 +101,7 @@ export const createTest = async (
       dateOfTest: testData.dateOfTest || new Date().toLocaleDateString(),
       testType: testData.testType || "All parameters",
       status: testData.status || "Completed",
+      videoUrl: testData.videoUrl || [], // Include video URLs array
     };
 
     console.log("Posting to API:", `${API_BASE_URL}/parameters`, parameterData);
@@ -132,6 +135,7 @@ export const createTest = async (
       volume: item.volume,
       days: item.days,
       delution: item.delution,
+      videoUrl: item.videoUrl || [], // Include video URLs in response
     };
   } catch (error) {
     console.error("Error creating test:", error);
