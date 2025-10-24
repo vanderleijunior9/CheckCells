@@ -1,6 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import crypto from "crypto";
 
 const region = "us-east-1";
 const bucketName = "testing-checkcells";
@@ -16,8 +15,10 @@ const s3Client = new S3Client({
 });
 
 export async function generateUploadUrl() {
-  const rawBytes = await crypto.randomBytes(16);
-  const imageName = rawBytes.toString("hex");
+  // Generate random bytes using Web Crypto API (browser compatible)
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  const imageName = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
   const command = new PutObjectCommand({
     Bucket: bucketName,
