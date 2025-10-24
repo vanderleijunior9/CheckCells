@@ -276,9 +276,11 @@ const CameraView = () => {
 
       try {
         // Get S3 upload URL
+        console.log(`🔗 Generating S3 upload URL for video ${recordingNumber}...`);
         const uploadUrl = await generateUploadUrl();
-        console.log(`🔗 S3 Upload URL generated for video ${recordingNumber}`);
+        console.log(`✅ S3 Upload URL generated for video ${recordingNumber}`);
 
+        console.log(`📤 Uploading video ${recordingNumber} to S3...`);
         const uploadResponse = await fetch(uploadUrl, {
           method: "PUT",
           body: videoBlob,
@@ -286,6 +288,8 @@ const CameraView = () => {
             "Content-Type": videoBlob.type,
           },
         });
+
+        console.log(`📊 Upload response status: ${uploadResponse.status}`);
 
         if (uploadResponse.ok) {
           // Extract the S3 URL from the upload URL
@@ -298,8 +302,14 @@ const CameraView = () => {
           console.log(`🔗 S3 URL: ${videoUrl}`);
           setUploadStatus(`Video ${recordingNumber} uploaded to S3!`);
         } else {
+          const errorText = await uploadResponse.text().catch(() => "No error details");
+          console.error(`❌ S3 upload failed:`, {
+            status: uploadResponse.status,
+            statusText: uploadResponse.statusText,
+            errorText
+          });
           throw new Error(
-            `S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`
+            `S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`
           );
         }
       } catch (uploadError) {
@@ -307,7 +317,7 @@ const CameraView = () => {
           `❌ S3 upload failed for video ${recordingNumber}:`,
           uploadError
         );
-        setUploadStatus(`S3 upload failed for video ${recordingNumber}`);
+        setUploadStatus(`S3 upload failed for video ${recordingNumber}: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}`);
         throw uploadError; // Re-throw to handle in parent
       }
 
