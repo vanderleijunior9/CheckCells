@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { createTest } from "../services/api";
 import { uploadVideo } from "../services/uploadService";
 import { generateUploadUrl } from "../services/simple_s3";
-import { uploadVideoViaProxy } from "../services/uploadProxy";
 
 interface FormData {
   scientist?: string;
@@ -276,7 +275,7 @@ const CameraView = () => {
       console.log(`📤 Uploading video ${recordingNumber} to S3`);
 
       try {
-        // Try direct S3 upload first
+        // Get S3 upload URL
         const uploadUrl = await generateUploadUrl();
         console.log(`🔗 S3 Upload URL generated for video ${recordingNumber}`);
 
@@ -304,26 +303,12 @@ const CameraView = () => {
           );
         }
       } catch (uploadError) {
-        console.warn(
-          `⚠️ Direct S3 upload failed for video ${recordingNumber}, trying proxy:`,
+        console.error(
+          `❌ S3 upload failed for video ${recordingNumber}:`,
           uploadError
         );
-        
-        // Fallback to proxy upload
-        try {
-          setUploadStatus(`Uploading video ${recordingNumber} via proxy...`);
-          videoUrl = await uploadVideoViaProxy(videoBlob, formData.testId || "unknown", recordingNumber);
-          console.log(`✅ Video ${recordingNumber} uploaded via proxy successfully!`);
-          console.log(`🔗 Proxy URL: ${videoUrl}`);
-          setUploadStatus(`Video ${recordingNumber} uploaded via proxy!`);
-        } catch (proxyError) {
-          console.error(
-            `❌ Both S3 and proxy upload failed for video ${recordingNumber}:`,
-            proxyError
-          );
-          setUploadStatus(`Upload failed for video ${recordingNumber}`);
-          throw proxyError;
-        }
+        setUploadStatus(`S3 upload failed for video ${recordingNumber}`);
+        throw uploadError; // Re-throw to handle in parent
       }
 
       setUploadStatus(`Preparing metadata ${recordingNumber}...`);
