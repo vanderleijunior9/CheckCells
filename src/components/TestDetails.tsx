@@ -9,7 +9,6 @@ import {
   Pause,
 } from "lucide-react";
 import { fetchTestComments, updateTestComments } from "../services/api";
-import { listVideosFromS3 } from "../services/s3Service";
 
 interface TestData {
   diagnosticianName: string;
@@ -20,7 +19,7 @@ interface TestData {
   volume?: number;
   days?: number;
   delution?: number;
-  videoUrl?: string[]; // Array of video URLs from S3
+  videoUrl?: string[]; // Array of video URLs
 }
 
 // interface TestResult {
@@ -120,7 +119,7 @@ const TestDetails = () => {
     loadFullDetailsParameters();
   }, [testData?.testId]);
 
-  // Fetch videos from API or AWS S3
+  // Fetch videos from API
   useEffect(() => {
     const loadVideoDetails = async () => {
       if (testData?.testId) {
@@ -128,7 +127,7 @@ const TestDetails = () => {
           setLoadingVideos(true);
           const testIdStr = String(testData.testId);
 
-          // First, check if videoUrl is available from the API
+          // Check if videoUrl is available from the API
           if (testData.videoUrl && testData.videoUrl.length > 0) {
             console.log(`🎥 Using video URLs from API for test: ${testIdStr}`);
             console.log(
@@ -137,23 +136,8 @@ const TestDetails = () => {
             );
             setVideos(testData.videoUrl);
           } else {
-            // Fallback to S3 if no videoUrl from API
-            console.log(
-              `🎥 No video URLs from API, fetching from AWS S3 for test: ${testIdStr}`
-            );
-
-            const videoUrls = await listVideosFromS3(testIdStr);
-
-            console.log(
-              `✅ Loaded ${videoUrls.length} video URLs from AWS S3:`,
-              videoUrls
-            );
-
-            if (videoUrls.length > 0) {
-              setVideos(videoUrls);
-            } else {
-              console.log("⚠️ No videos found in AWS S3 for this test");
-            }
+            console.log(`⚠️ No video URLs found in API for test: ${testIdStr}`);
+            setVideos([]);
           }
         } catch (error) {
           console.error("Failed to load video details:", error);

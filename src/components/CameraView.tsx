@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { createTest } from "../services/api";
-import { generateUploadUrl } from "../services/simple_s3";
-import { listVideosFromS3 } from "../services/s3Service";
 
 interface FormData {
   scientist?: string;
@@ -23,7 +20,6 @@ const CameraView = () => {
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -185,8 +181,8 @@ const CameraView = () => {
         );
       }
 
-      // Log summary of what will be saved
-      console.log("=== SAVING TEST SUMMARY ===");
+      // Log summary of what was captured
+      console.log("=== TEST CAPTURE SUMMARY ===");
       console.log("Form Data:", {
         scientist: formData.scientist,
         testId: formData.testId,
@@ -194,61 +190,13 @@ const CameraView = () => {
         days: formData.days,
         dilution: formData.dilution,
       });
-      console.log(`Number of videos: ${acceptedVideos.length}`);
-      console.log(`Local Server Upload: ENABLED ✅`);
+      console.log(`Number of videos captured: ${acceptedVideos.length}`);
+      console.log(`Total video duration: ${Math.round(totalVideoDuration)}s`);
 
-      // Upload all accepted videos to API first
-      console.log(`Uploading ${acceptedVideos.length} videos to aws...`);
-      setUploadStatus(`Uploading videos (0/${acceptedVideos.length})...`);
+      // Videos are stored locally in acceptedVideos state (no upload needed)
+      setUploadStatus("Test captured successfully!");
 
-      for (let i = 0; i < acceptedVideos.length; i++) {
-        setUploadStatus(
-          `Uploading videos (${i + 1}/${acceptedVideos.length})...`
-        );
-        await uploadVideoToAPI(acceptedVideos[i], i + 1);
-      }
-
-      setUploadStatus("Collecting video URLs from S3...");
-
-      // Get all video URLs from S3 for this test
-      let videoUrls: string[] = [];
-      try {
-        videoUrls = await listVideosFromS3(formData.testId);
-        console.log(
-          `📹 Found ${videoUrls.length} videos in S3 for test ${formData.testId}:`,
-          videoUrls
-        );
-      } catch (error) {
-        console.error("Failed to get video URLs from S3:", error);
-        // Continue with empty array if S3 fails
-        videoUrls = [];
-      }
-
-      setUploadStatus("Saving test information...");
-
-      // Prepare test data for API
-      const testData = {
-        diagnosticianName: formData.scientist,
-        testId: formData.testId,
-        volume: parseFloat(formData.volume || "0") || 0,
-        days: parseFloat(formData.days || "0") || 0,
-        delution: parseFloat(formData.dilution || "0") || 0,
-        dateOfTest: new Date().toLocaleDateString(),
-        testType: "All parameters",
-        status: "Completed",
-        videoUrl: videoUrls, // Add video URLs to the test data
-      };
-
-      console.log("Saving test to API with video URLs:", testData);
-
-      // Post test data to API
-      const result = await createTest(testData);
-
-      console.log("Test saved successfully:", result);
-
-      setUploadStatus("Test saved successfully!");
-
-      // Navigate to all tests page after successful save
+      // Navigate to all tests page after successful capture
       setTimeout(() => {
         navigate("/all-tests");
       }, 500);
@@ -273,157 +221,6 @@ const CameraView = () => {
   const handleRejectTest = () => {
     // Go back to the form
     navigate("/new-test", { state: formData });
-  };
-
-  const uploadVideoToAPI = async (videoBlob: Blob, recordingNumber: number) => {
-    try {
-      setUploading(true);
-
-      let videoUrl = "";
-
-      // Upload video to S3
-      setUploadStatus(`Uploading video ${recordingNumber} to S3...`);
-      console.log(`📤 Uploading video ${recordingNumber} to S3`);
-
-      try {
-        // Get S3 upload URL
-        console.log(
-          `🔗 Generating S3 upload URL for video ${recordingNumber}...`
-        );
-        const uploadUrl = await generateUploadUrl();
-        console.log(`✅ S3 Upload URL generated for video ${recordingNumber}`);
-
-        console.log(`📤 Uploading video ${recordingNumber} to S3...`);
-        const uploadResponse = await fetch(uploadUrl, {
-          method: "PUT",
-          body: videoBlob,
-          headers: {
-            "Content-Type": videoBlob.type,
-          },
-        });
-
-        console.log(`📊 Upload response status: ${uploadResponse.status}`);
-
-        if (uploadResponse.ok) {
-          // Extract the S3 URL from the upload URL
-          const url = new URL(uploadUrl);
-          videoUrl = `https://${url.hostname}${url.pathname}`;
-
-          console.log(
-            `✅ Video ${recordingNumber} uploaded to S3 successfully!`
-          );
-          console.log(`🔗 S3 URL: ${videoUrl}`);
-          setUploadStatus(`Video ${recordingNumber} uploaded to S3!`);
-        } else {
-          const errorText = await uploadResponse
-            .text()
-            .catch(() => "No error details");
-          console.error(`❌ S3 upload failed:`, {
-            status: uploadResponse.status,
-            statusText: uploadResponse.statusText,
-            errorText,
-          });
-          throw new Error(
-            `S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`
-          );
-        }
-      } catch (uploadError) {
-        console.error(
-          `❌ S3 upload failed for video ${recordingNumber}:`,
-          uploadError
-        );
-        setUploadStatus(
-          `S3 upload failed for video ${recordingNumber}: ${
-            uploadError instanceof Error ? uploadError.message : "Unknown error"
-          }`
-        );
-        throw uploadError; // Re-throw to handle in parent
-      }
-
-      setUploadStatus(`Preparing metadata ${recordingNumber}...`);
-
-      // Prepare data payload with user inputs + S3 video URL
-      const dataToUpload = {
-        name: "Video Recording",
-        videoUrl: videoUrl, // S3 URL
-        // User-inputted information from form
-        scientist: formData.scientist || "",
-        testId: formData.testId || "",
-        volume: parseFloat(formData.volume || "0") || 0,
-        days: parseFloat(formData.days || "0") || 0,
-        delution: parseFloat(formData.dilution || "0") || 0,
-        // Auto-generated metadata
-        timestamp: new Date().toISOString(),
-        recordingNumber: recordingNumber,
-      };
-
-      // Log the data being uploaded (for debugging)
-      console.log("Saving test metadata to API:", {
-        scientist: dataToUpload.scientist,
-        testId: dataToUpload.testId,
-        volume: dataToUpload.volume,
-        days: dataToUpload.days,
-        dilution: dataToUpload.delution,
-        recordingNumber: dataToUpload.recordingNumber,
-        videoUrl: videoUrl,
-      });
-
-      // Upload to API - single POST with all data combined
-      const response = await fetch(
-        "https://68e89221f2707e6128cb466c.mockapi.io/api/v1/parameters",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          // body: JSON.stringify(dataToUpload),
-        }
-      );
-
-      if (response.ok) {
-        setUploadStatus("Video uploaded successfully!");
-        console.log("Video and user data uploaded successfully!");
-        // Don't navigate automatically anymore - let the prompt handle it
-      } else if (response.status === 404) {
-        setUploadStatus(
-          "API endpoint not found. Please check your connection."
-        );
-        console.error(
-          "404 Error: API endpoint not found. URL:",
-          "/api/parameters"
-        );
-      } else if (response.status === 413) {
-        setUploadStatus(
-          "Video is still too large. Recording saved locally only."
-        );
-        console.error(
-          "413 Error: Video compressed but still too large for API"
-        );
-      } else if (response.status === 400) {
-        setUploadStatus("Invalid data format. Please check your inputs.");
-        console.error("400 Error: Bad request - invalid data format");
-      } else if (response.status === 500) {
-        setUploadStatus("Server error. Please try again later.");
-        console.error("500 Error: Internal server error");
-      } else {
-        setUploadStatus(`Upload failed: ${response.status}. Please try again.`);
-        console.error(
-          `HTTP Error ${response.status}:`,
-          await response.text().catch(() => "No error details")
-        );
-      }
-    } catch (error) {
-      console.error("Error uploading video:", error);
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        setUploadStatus(
-          "Network error. Please check your internet connection."
-        );
-      } else {
-        setUploadStatus("Upload failed. Please try again.");
-      }
-    } finally {
-      setUploading(false);
-    }
   };
 
   const stopRecording = () => {
@@ -778,7 +575,7 @@ const CameraView = () => {
               ⬛ Stop Recording
             </button>
           </>
-        ) : !uploading ? (
+        ) : (
           // Ready to record buttons
           <>
             <button
@@ -797,13 +594,6 @@ const CameraView = () => {
               Cancel
             </button>
           </>
-        ) : (
-          <button
-            disabled
-            className="bg-gray-400 text-white px-6 py-2 rounded-lg font-semibold shadow cursor-not-allowed"
-          >
-            Uploading...
-          </button>
         )}
       </div>
     </div>

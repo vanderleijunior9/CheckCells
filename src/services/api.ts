@@ -1,3 +1,6 @@
+// MockAPI endpoint
+const API_BASE_URL = "https://68e89221f2707e6128cb466c.mockapi.io/api/v1";
+
 interface TestData {
   diagnosticianName: string;
   testId: string;
@@ -7,7 +10,7 @@ interface TestData {
   volume?: number;
   days?: number;
   delution?: number;
-  videoUrl?: string[]; // Array of video URLs from S3
+  videoUrl?: string[]; // Array of video URLs
 }
 
 interface ApiParameter {
@@ -22,11 +25,8 @@ interface ApiParameter {
   testType?: string;
   status?: string;
   video?: string;
-  videoUrl?: string[]; // Array of video URLs from S3
+  videoUrl?: string[]; // Array of video URLs
 }
-
-// MockAPI endpoint
-const API_BASE_URL = "https://68e89221f2707e6128cb466c.mockapi.io/api/v1";
 
 // Function to fetch all test data
 export const fetchTestData = async (): Promise<TestData[]> => {
